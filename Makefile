@@ -1,4 +1,6 @@
 
+CXX_STD=c++11 # set to c++0x if using old GCC
+
 BUILD_DIR=$(shell echo `pwd`/build)
 THIRDPARTY=$(shell echo `pwd`/thirdparty)
 AMQPCPP=$(THIRDPARTY)/amqpcpp
@@ -15,6 +17,6 @@ amqpcpp:
 	cd thirdparty/amqpcpp && make -j4 PREFIX=./install && make install PREFIX=./install
 
 repeat: dirs amqpcpp
-	$(CXX) -std=c++11 -o $(BUILD_DIR)/repeat-cpp ./examples/repeat.cpp $(CXXFLAGS) -I./src $(LDFLAGS)
+	$(CXX) -std=$(CXX_STD) -o $(BUILD_DIR)/repeat-cpp ./examples/repeat.cpp $(CXXFLAGS) -I./src $(LDFLAGS)
 
 
