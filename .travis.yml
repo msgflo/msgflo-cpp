@@ -10,6 +10,7 @@ before_install:
 install:
 - npm install
 before_script:
+- export CXX=clang++
 - make CXX_STD=c++0x
 script:
 - npm test
