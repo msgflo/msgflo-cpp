@@ -10,3 +10,9 @@ This library makes it easy to create MsgFlo participants in C++.
 
 * Basic support for setting up and running Participants with AMQP/RabbitMQ transport
 
+## Usage
+
+See [./examples/repeat.cpp](./examples/repeat.cpp)
+
+    make
+    ./build/repeat-cpp
