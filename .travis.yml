@@ -5,11 +5,12 @@ services:
 node_js:
 - '0.10'
 before_install:
+- sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
 - sudo apt-get update -qq
-- sudo apt-get install pkg-config cmake
+- sudo apt-get install gcc-5
 install:
 - npm install
 before_script:
-- make CPP=clang++
+- make
 script:
 - npm test
