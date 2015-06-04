@@ -8,12 +8,12 @@ before_install:
 - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
 - sudo add-apt-repository ppa:boost-latest/ppa -y
 - sudo apt-get update -qq
-- sudo apt-get install g++-5
+- sudo apt-get install g++-4.8
 - sudo apt-get install libboost1.55-all-dev
 
 install:
 - npm install
 before_script:
-- make CPP=g++-5 EXTRA_LDFLAGS=-L/usr/lib/x86_64-linux-gnu/
+- make CPP=g++-4.8 EXTRA_LDFLAGS=-L/usr/lib/x86_64-linux-gnu/
 script:
 - npm test
