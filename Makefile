@@ -17,6 +17,6 @@ amqpcpp:
 	cd thirdparty/amqpcpp && make -j4 PREFIX=./install && make install PREFIX=./install
 
 repeat: dirs amqpcpp
-	$(CXX) -std=$(CXX_STD) -o $(BUILD_DIR)/repeat-cpp ./examples/repeat.cpp $(CXXFLAGS) -I./src $(LDFLAGS)
+	$(CPP) -std=$(CXX_STD) -o $(BUILD_DIR)/repeat-cpp ./examples/repeat.cpp $(CXXFLAGS) -I./src $(LDFLAGS)
 
 
