@@ -22,4 +22,4 @@ See [./examples/repeat.cpp](./examples/repeat.cpp)
 
 ## License
 
-MIT, see [./LICENSE]
+MIT, see [./LICENSE](./LICENSE)
