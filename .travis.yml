@@ -14,6 +14,6 @@ before_install:
 install:
 - npm install
 before_script:
-- make CPP=g++-5 EXTRA_LDFLAGS=/usr/lib/x86_64-linux-gnu/
+- make CPP=g++-5 EXTRA_LDFLAGS=-L/usr/lib/x86_64-linux-gnu/
 script:
 - npm test
