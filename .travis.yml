@@ -11,6 +11,6 @@ before_install:
 install:
 - npm install
 before_script:
-- make
+- make CPP=g++-5
 script:
 - npm test
