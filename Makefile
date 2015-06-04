@@ -7,7 +7,7 @@ THIRDPARTY=$(shell echo `pwd`/thirdparty)
 AMQPCPP=$(THIRDPARTY)/amqpcpp
 
 CXXFLAGS=-I$(THIRDPARTY)/json11/ -I$(AMQPCPP)/install/include/ -I$(AMQPCPP)/examples/rabbitmq_tutorials
-LDFLAGS=$(AMQPCPP)/install/lib/libamqpcpp.a.2.2.0 -lboost_system -pthread
+LDFLAGS=$(AMQPCPP)/install/lib/libamqpcpp.a.2.2.0 $(EXTRA_LDFLAGS) -lboost_system -pthread
 
 all: repeat
 
