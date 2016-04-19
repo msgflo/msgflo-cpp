@@ -53,7 +53,8 @@ public:
 
     static Definition instantiate(Definition &d, std::string role)
     {
-        d.id = role; // TODO: add unique suffix
+        d.id = role + std::to_string(rand());
+        d.role = role;
 
         for (auto &p : d.inports) {
             addDefaultQueue(p, role);
@@ -93,6 +94,7 @@ public:
         auto ins = ports_to_json(inports);
         return Json::object {
             { "id", id },
+            { "role", role },
             { "component", component },
             { "label", label },
             { "icon", icon },
@@ -103,6 +105,7 @@ public:
 
 public:
     std::string id;
+    std::string role;
     std::string component;
     std::string label = "";
     std::string icon = "file-word-o";
