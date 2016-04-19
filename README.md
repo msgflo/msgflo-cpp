@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/msgflo/msgflo-cpp.svg?branch=master)](https://travis-ci.org/msgflo/msgflo-cpp)
 # msgflo-cpp: C++ participant support for MsgFlo
 
 [MsgFlo](https://github.com/msgflo/msgflo) is a distributed, polyglot FBP (flow-based-programming)
