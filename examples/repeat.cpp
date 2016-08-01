@@ -1,12 +1,10 @@
-
-
 #include <iostream>
 #include <algorithm>
 #include <thread>
 #include <chrono>
 #include <boost/algorithm/string.hpp>
 
-#include "msgflo.cpp"
+#include "msgflo.h"
 
 class Repeat : public msgflo::Participant
 {

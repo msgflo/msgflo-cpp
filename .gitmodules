@@ -4,3 +4,6 @@
 [submodule "thirdparty/amqpcpp"]
 	path = thirdparty/amqpcpp
 	url = https://github.com/CopernicaMarketingSoftware/AMQP-CPP.git
+[submodule "thirdparty/mosquitto"]
+	path = thirdparty/mosquitto
+	url = https://git.eclipse.org/r/mosquitto/org.eclipse.mosquitto
