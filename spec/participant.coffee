@@ -6,11 +6,12 @@ heterogenous = require '../node_modules/msgflo/spec/heterogenous.coffee'
 participants =
   'C++Repeat': [path.join __dirname, '..', 'build', './repeat-cpp']
 
-describe 'Participants', ->
-  address = 'amqp://localhost'
-  g =
-    broker: null
-    commands: participants
+# Note: most require running an external broker service
+transports =
+  #'MQTT': 'mqtt://localhost'
+  'AMQP': 'amqp://localhost'
+
+transportTests = (g, address) ->
 
   beforeEach (done) ->
     g.broker = msgflo.transport.getBroker address
@@ -23,4 +24,12 @@ describe 'Participants', ->
     heterogenous.testParticipant g, name
 
 
+describe 'Participants', ->
+  g =
+    broker: null
+    commands: participants
 
+  Object.keys(transports).forEach (type) =>
+    describe "#{type}", () ->
+      address = transports[type]
+      transportTests g, address
