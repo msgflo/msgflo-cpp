@@ -144,9 +144,9 @@ class Engine {
 public:
     virtual void send(std::string port, Message &msg) = 0;
 
-    virtual void ack(Message msg) = 0;
+    virtual void ack(const Message &msg) = 0;
 
-    virtual void nack(Message msg) = 0;
+    virtual void nack(const Message &msg) = 0;
 
     virtual bool connected() = 0;
 protected:

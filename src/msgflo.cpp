@@ -4,7 +4,6 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/asio/io_service.hpp>
 #include "amqpcpp.h"
-#include "mosquitto.h"
 #include "mqtt_support.h"
 #include "msgflo.h"
 
@@ -36,29 +35,35 @@ public:
 protected:
 
     void onConnected(AMQP::TcpConnection *connection) {
+        static_cast<void>(connection);
         connected = true;
     }
 
     void onError(AMQP::TcpConnection *connection, const char *message) {
+        static_cast<void>(connection);
+        static_cast<void>(message);
         connected = false;
     }
 
     void onClosed(AMQP::TcpConnection *connection) {
+        static_cast<void>(connection);
         connected = false;
     }
 
     void monitor(AMQP::TcpConnection *connection, int fd, int flags) {
+        static_cast<void>(connection);
+        static_cast<void>(fd);
+        static_cast<void>(flags);
     }
 };
 
 class AmqpEngine final : public Engine, public std::enable_shared_from_this<AmqpEngine> {
-    friend class Participant;
 
 public:
     AmqpEngine(Participant *p, const string &url)
         : Engine()
         , handler()
-        , connection(&handler, AMQP::Address(""))
+        , connection(&handler, AMQP::Address(url))
         , channel(&connection)
         , participant(p)
     {
@@ -101,6 +106,8 @@ private:
                        uint64_t deliveryTag,
                        bool redelivered)
             {
+                static_cast<void>(redelivered);
+
                 const auto body = message.message();
                 std::cout<<" [x] Received "<<body<<std::endl;
                 Message msg;
@@ -122,10 +129,11 @@ public:
         channel.publish(exchange, "", env);
     }
 
-    void ack(Message msg) override {
+    void ack(const Message &msg) override {
         channel.ack(msg.deliveryTag);
     }
-    void nack(Message msg) override {
+    void nack(const Message &msg) override {
+        static_cast<void>(msg);
         // channel.nack(msg.deliveryTag); // FIXME: implement
     }
 
@@ -141,7 +149,7 @@ class MosquittoEngine final : public Engine {
 public:
     MosquittoEngine(Participant *participant, const string &host, const int port, const int keep_alive,
                     const string &client_id, const bool clean_session) :
-            _participant(participant), client(host, port, keep_alive, client_id, clean_session) {
+            _listener(), _participant(participant), client(&_listener, host, port, keep_alive, client_id, clean_session) {
         client.connect();
     }
 
@@ -149,13 +157,17 @@ public:
         client.disconnect();
     }
 
-    void send(std::string port, Message &msg) override {
+    void send(string port, Message &msg) override {
+        static_cast<void>(port);
+        static_cast<void>(msg);
     }
 
-    void ack(Message msg) override {
+    void ack(const Message &msg) override {
+        static_cast<void>(msg);
     }
 
-    void nack(Message msg) override {
+    void nack(const Message &msg) override {
+        static_cast<void>(msg);
     }
 
     bool connected() override {
@@ -163,8 +175,20 @@ public:
     }
 
 private:
-    mqtt_client<trygvis::mqtt_support::mqtt_client_personality::threaded> client;
+    class listener : public mqtt_event_listener {
+    public:
+        listener() {
+            cerr << "woot" << endl;
+        }
+
+        virtual void on_msg(const string &str) override {
+            cerr << "mqtt: " << str << endl;
+        }
+    };
+
+    listener _listener;
     const Participant *_participant;
+    mqtt_client<trygvis::mqtt_support::mqtt_client_personality::threaded> client;
 };
 
 shared_ptr<Engine> createEngine(Participant *participant, const std::string &url) {
@@ -179,13 +203,13 @@ shared_ptr<Engine> createEngine(Participant *participant, const std::string &url
         cout << "s: " << s << endl;
         auto i_up = s.find('@');
 
-        if (i_up >= 0) {
+        if (i_up != string::npos) {
             string up = s.substr(0, i_up);
             cout << "up: " << up << endl;
 
             auto i_u = up.find(':');
 
-            if (i_u >= 0) {
+            if (i_u != string::npos) {
                 username = up.substr(0, i_u);
                 password = up.substr(i_u + 1);
             }
@@ -209,4 +233,4 @@ shared_ptr<Engine> createEngine(Participant *participant, const std::string &url
     throw std::runtime_error("Unsupported URL scheme: " + url);
 }
 
-} // namespace msgflo;
+} // namespace msgflo

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(msgflo_cpp)
+project(msgflo_cppX)
 
 set(MSGFLO_VERSION 1.0)
 
@@ -43,11 +43,16 @@ target_include_directories(msgflo
     PRIVATE ${mosquitto_INCLUDE_DIRECTORY}
     PRIVATE src)
 
+# amqp just as too many unused parameters
+target_compile_options(msgflo PRIVATE -Wall -Wextra -Wno-unused-parameter)
+
 target_link_libraries(msgflo
     PRIVATE ${Boost_LIBRARIES} ${amqp_install}/lib/libamqpcpp.a ${mosquitto_LIB})
 target_compile_features(msgflo PUBLIC cxx_range_for)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/"
     DESTINATION "include")
+
+add_subdirectory(examples)
 
 add_dependencies(msgflo amqpcpp_project)
 

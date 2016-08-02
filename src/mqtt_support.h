@@ -33,6 +33,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 #include <condition_variable>
 #include <vector>
 #include <limits.h>
+#include <unistd.h>
 #include "mosquitto.h"
 
 namespace trygvis {
@@ -48,25 +49,7 @@ string error_to_string(int rc) {
     return string(mosquitto_strerror(rc));
 }
 
-static
-vector<string> mqtt_tokenize_topic(string path) {
-    char **topics;
-    int topic_count;
-    int i;
-
-    mosquitto_sub_topic_tokenise(path.c_str(), &topics, &topic_count);
-
-    vector<string> res;
-    for (i = 0; i < topic_count; i++) {
-        if (topics[i] != NULL) {
-            res.emplace_back(topics[i]);
-        }
-    }
-
-    mosquitto_sub_topic_tokens_free(&topics, topic_count);
-
-    return res;
-}
+vector<string> mqtt_tokenize_topic(string path);
 
 class waitable {
 protected:
@@ -156,6 +139,7 @@ public:
 private:
     static atomic_int mqtt_client_instance_count;
     static mutex mqtt_client_mutex_;
+//    static string hostname;
 };
 
 enum mqtt_client_personality {
@@ -163,8 +147,17 @@ enum mqtt_client_personality {
     polling
 };
 
+class mqtt_event_listener {
+public:
+    virtual void on_msg(const string &str) = 0;
+
+    virtual ~mqtt_event_listener() = default;
+};
+
 template<mqtt_client_personality personality>
 class mqtt_client : public waitable, private mqtt_lib {
+    using guard = lock_guard<recursive_mutex>;
+
     template<bool>
     struct personality_tag {
     };
@@ -173,21 +166,17 @@ class mqtt_client : public waitable, private mqtt_lib {
     typedef personality_tag<mqtt_client_personality::polling> polling_tag;
     const personality_tag<personality> p_tag{};
 
-    struct mosquitto *mosquitto;
+    mqtt_event_listener *event_listener;
 
     const string host;
     const int port;
+    bool connecting_, connected_;
     const int keep_alive;
+    int unacked_messages_;
 
     recursive_mutex this_mutex;
-    using guard = lock_guard<recursive_mutex>;
 
-    bool connecting_, connected_;
-//    bool should_reconnect_;
-
-    int unacked_messages_;
-//    condition_variable cv;
-//    mutex cv_mutex;
+    struct mosquitto *mosquitto;
 
     void assert_success(const string &function, int rc) {
         if (rc != MOSQ_ERR_SUCCESS) {
@@ -196,16 +185,15 @@ class mqtt_client : public waitable, private mqtt_lib {
     }
 
 public:
-    mqtt_client(const string &host, const int port, const int keep_alive, const string &client_id,
-                const bool clean_session) :
-        host(host), port(port), connecting_(false), connected_(false), /*should_reconnect_(false),*/
-        keep_alive(keep_alive), unacked_messages_(0) {
+    mqtt_client(mqtt_event_listener *event_listener, const string &host, const int port, const int keep_alive,
+                const string &client_id, const bool clean_session) :
+            event_listener(event_listener), host(host), port(port), connecting_(false), connected_(false),
+            keep_alive(keep_alive), unacked_messages_(0) {
         const char *id = nullptr;
 
         if (!client_id.empty()) {
             id = client_id.c_str();
-        }
-        else {
+        } else {
             if (!clean_session) {
                 throw mqtt_error("If client id is not specified, clean session must be true", MOSQ_ERR_INVAL);
             }
@@ -229,6 +217,7 @@ public:
 
 private:
     void post_construct(threaded_tag) {
+        event_listener->on_msg("mosquitto_loop_start");
         int rc = mosquitto_loop_start(mosquitto);
         assert_success("mosquitto_loop_start", rc);
     }
@@ -248,6 +237,9 @@ public:
 private:
     void pre_destruct(threaded_tag) {
         int rc = mosquitto_loop_stop(mosquitto, true);
+        if (rc) {
+            event_listener->on_msg("mosquitto_loop_stop: " + error_to_string(rc));
+        }
     }
 
     void pre_destruct(polling_tag) {
@@ -274,6 +266,9 @@ public:
     void connect() {
         guard lock(this_mutex);
 
+        event_listener->on_msg(
+                "Connecting to " + host + ":" + to_string(port) + ", keep_alive=" + to_string(keep_alive));
+
         if (connecting_ || connected_) {
             disconnect();
         }
@@ -286,6 +281,7 @@ private:
         connecting_ = true;
         connected_ = false;
 
+        event_listener->on_msg("mosquitto_connect_async");
         int rc = mosquitto_connect_async(mosquitto, host.c_str(), port, keep_alive);
         assert_success("mosquitto_connect_async", rc);
     }
@@ -294,6 +290,7 @@ private:
         connecting_ = false;
         connected_ = true;
 
+        event_listener->on_msg("mosquitto_connect");
         int rc = mosquitto_connect(mosquitto, host.c_str(), port, keep_alive);
         assert_success("mosquitto_connect", rc);
     }
@@ -305,6 +302,11 @@ private:
         connected_ = rc == MOSQ_ERR_SUCCESS;
         connecting_ = false;
 
+        if (connected_) {
+            event_listener->on_msg("Connected");
+        } else {
+            event_listener->on_msg("Could not connect: " + error_to_string(rc));
+        }
         on_connect(rc);
 
         cv.notify_all();
@@ -312,6 +314,8 @@ private:
 
     void on_disconnect_wrapper(int rc) {
         guard lock(this_mutex);
+
+        event_listener->on_msg("Disconnected, rc=" + error_to_string(rc));
 
         bool was_connecting = connecting_, was_connected = connected_;
         connecting_ = connected_ = false;
@@ -325,6 +329,7 @@ private:
     void on_publish_wrapper(int message_id) {
         guard lock(this_mutex);
 
+        event_listener->on_msg("message ACKed, message id=" + message_id);
         unacked_messages_--;
 
         on_publish(message_id);
@@ -338,6 +343,7 @@ private:
     }
 
     void on_subscribe_wrapper(int mid, int qos_count, const int *granted_qos) {
+        static_cast<void>(qos_count);
         guard lock(this_mutex);
         on_subscribe(mid, mid, granted_qos);
     }
@@ -355,7 +361,9 @@ private:
 
 public:
     void disconnect() {
+        event_listener->on_msg("Disconnecting, connected: " + string(connected() ? "yes" : "no"));
         int rc = mosquitto_disconnect(mosquitto);
+        event_listener->on_msg("mosquitto_disconnect: " + error_to_string(rc));
     }
 
     void subscribe(int *mid, const string &topic, int qos) {
@@ -379,6 +387,8 @@ public:
 //        if (!connected_) {
 //            throw mqtt_error("not connected", MOSQ_ERR_NO_CONN);
 //        }
+
+        event_listener->on_msg("Publishing " + to_string(payload_len) + " bytes to " + topic);
 
         int rc = mosquitto_publish(mosquitto, mid, topic.c_str(), payload_len, payload, qos, retain);
 
@@ -414,52 +424,64 @@ private:
 
 protected:
     virtual void on_connect(int rc) {
+        static_cast<void>(rc);
     }
 
     virtual void on_disconnect(bool was_connecting, bool was_connected, int rc) {
+        static_cast<void>(was_connecting);
+        static_cast<void>(was_connected);
+        static_cast<void>(rc);
     }
 
     virtual void on_publish(int mid) {
+        static_cast<void>(mid);
     }
 
     virtual void on_message(const struct mosquitto_message *message) {
+        static_cast<void>(message);
     }
 
     virtual void on_subscribe(int mid, int qos_count, const int *granted_qos) {
+        static_cast<void>(mid);
+        static_cast<void>(qos_count);
+        static_cast<void>(granted_qos);
     }
 
     virtual void on_unsubscribe(int mid) {
+        static_cast<void>(mid);
     }
 
     virtual void on_log(int level, const char *str) {
+        static_cast<void>(level);
+        static_cast<void>(str);
     }
 
 private:
-    static void on_connect_cb(struct mosquitto *m, void *self, int rc) {
+    static void on_connect_cb(struct mosquitto *, void *self, int rc) {
         static_cast<mqtt_client *>(self)->on_connect_wrapper(rc);
     }
 
-    static void on_disconnect_cb(struct mosquitto *m, void *self, int rc) {
+    static void on_disconnect_cb(struct mosquitto *, void *self, int rc) {
         static_cast<mqtt_client *>(self)->on_disconnect_wrapper(rc);
     }
 
-    static void on_publish_cb(struct mosquitto *m, void *self, int rc) {
+    static void on_publish_cb(struct mosquitto *, void *self, int rc) {
         static_cast<mqtt_client *>(self)->on_publish_wrapper(rc);
     }
 
-    static void on_message_cb(struct mosquitto *m, void *self, const mosquitto_message *message) {
+    static void on_message_cb(struct mosquitto *, void *self, const mosquitto_message *message) {
         static_cast<mqtt_client *>(self)->on_message_wrapper(message);
     }
 
-    static void on_subscribe_cb(struct mosquitto *m, void *self, int mid, int qos_count, const int *granted_qos) {
+    static void on_subscribe_cb(struct mosquitto *, void *self, int mid, int qos_count, const int *granted_qos) {
         static_cast<mqtt_client *>(self)->on_subscribe_wrapper(mid, qos_count, granted_qos);
     }
 
-    static void on_unsubscribe_cb(struct mosquitto *m, void *self, int mid) {
+    static void on_unsubscribe_cb(struct mosquitto *, void *self, int mid) {
         static_cast<mqtt_client *>(self)->on_unsubscribe_wrapper(mid);
     }
 
-    static void on_log_cb(struct mosquitto *m, void *self, int level, const char *str) {
+    static void on_log_cb(struct mosquitto *, void *self, int level, const char *str) {
         static_cast<mqtt_client *>(self)->on_log_wrapper(level, str);
     }
 };

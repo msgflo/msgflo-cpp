@@ -3,7 +3,4 @@
 	url = https://github.com/dropbox/json11
 [submodule "thirdparty/amqpcpp"]
 	path = thirdparty/amqpcpp
-	url = https://github.com/CopernicaMarketingSoftware/AMQP-CPP.git
-[submodule "thirdparty/mosquitto"]
-	path = thirdparty/mosquitto
-	url = https://git.eclipse.org/r/mosquitto/org.eclipse.mosquitto
+	url = https://github.com/trygvis/AMQP-CPP.git
