@@ -1,12 +1,11 @@
 #pragma once
 
 #include <string>
+#include <memory>
+
+#include "json11.hpp"
 
 namespace msgflo {
-
-class Engine;
-
-Engine createEngine(std::string url);
 
 struct Definition {
 
@@ -15,12 +14,11 @@ struct Definition {
         std::string type;
         std::string queue;
 
-        json11::Json to_json() const
-        {
+        json11::Json to_json() const {
             return json11::Json::object {
-                    { "id", id },
-                    { "type", type },
-                    { "queue", queue }
+                    {"id",    id},
+                    {"type",  type},
+                    {"queue", queue}
             };
         }
     };
@@ -39,12 +37,11 @@ public:
         if (!p.queue.empty()) {
             return p;
         }
-        p.queue = role+"."+boost::to_upper_copy<std::string>(p.id);
+        p.queue = role + "." + boost::to_upper_copy<std::string>(p.id);
         return p;
     }
 
-    static Definition instantiate(Definition &d, std::string role)
-    {
+    static Definition instantiate(Definition &d, std::string role) {
         d.id = role + std::to_string(rand());
         d.role = role;
 
@@ -58,19 +55,15 @@ public:
     }
 
 public:
-    Definition()
-            : inports {
-            Port{ "in", "any", "" }
-    },
-              outports {
-                      Port{ "out", "any", "" },
-                      Port{ "error", "error", "" }
-              }
-    {
-    }
+    Definition() :
+            inports{
+                    Port{"in", "any", ""}},
+            outports{
+                    Port{"out", "any", ""},
+                    Port{"error", "error", ""}
+            } {}
 
-    json11::Json ports_to_json(const std::vector<Port> &ports) const
-    {
+    json11::Json ports_to_json(const std::vector<Port> &ports) const {
         using namespace json11;
         auto objects = std::vector<Json>();
         for (const auto &p : ports) {
@@ -79,19 +72,18 @@ public:
         return Json::array(objects);
     }
 
-    json11::Json to_json() const
-    {
+    json11::Json to_json() const {
         using namespace json11;
 
         auto ins = ports_to_json(inports);
         return Json::object {
-                { "id", id },
-                { "role", role },
-                { "component", component },
-                { "label", label },
-                { "icon", icon },
-                { "inports", ins },
-                { "outports", ports_to_json(outports) }
+                {"id",        id},
+                {"role",      role},
+                {"component", component},
+                {"label",     label},
+                {"icon",      icon},
+                {"inports",   ins},
+                {"outports",  ports_to_json(outports)}
         };
     }
 
@@ -117,14 +109,17 @@ struct Message {
     Type type = Json;
 };
 
+class Engine;
+
 class Participant {
     friend class Engine;
 
 public:
     Participant(std::string _role, Definition _def)
-            : role(_role)
-    {
-        definition = Definition::instantiate(_def, role);
+            : role(_role), _definition(Definition::instantiate(_def, role)) {}
+
+    const Definition *definition() const {
+        return &_definition;
     }
 
 protected:
@@ -136,12 +131,37 @@ protected:
 
     // ACK/NACK
     void ack(Message msg);
+
     void nack(Message msg);
 
 private:
-    std::string role;
-    Engine* _engine = nullptr;
-    Definition definition;
+    const std::string role;
+    const Definition _definition;
+    std::shared_ptr<Engine> _engine{};
 };
+
+class Engine {
+public:
+    virtual void start() = 0;
+
+    virtual void stop() = 0;
+
+    virtual void send(std::string port, Message &msg) = 0;
+
+    virtual void ack(Message msg) = 0;
+
+    virtual void nack(Message msg) = 0;
+
+protected:
+    void setEngine(Participant *participant, std::shared_ptr<Engine> e) {
+        participant->_engine = e;
+    }
+
+    void process(Participant *participant, std::string port, Message msg) {
+        participant->process(port, msg);
+    }
+};
+
+std::shared_ptr<Engine> createEngine(Participant *participant, const std::string &url);
 
 } // namespace msgflo

@@ -36,14 +36,11 @@ private:
     }
 };
 
-int main(void)
+int main(int argc, const char **argv)
 {
-    // TODO: allow to set broker info, name on commandline or with envvar
     Repeat repeater("repeat");
-    msgflo::ConnectionOptions o;
-    msgflo::Engine engine(&repeater, o);
+    auto engine{msgflo::createEngine(&repeater, argv[1])};
 
     std::cout << " [*] Waiting for messages. To exit press CTRL-C" << std::endl;
-    engine.start();
     return 0;
 }

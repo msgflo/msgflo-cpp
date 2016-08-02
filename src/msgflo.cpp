@@ -4,19 +4,14 @@
 #include <iostream>
 #include <algorithm>
 #include <thread>
-#include <chrono>
 #include <boost/algorithm/string.hpp>
 #include <boost/asio/io_service.hpp>
 #include "amqpcpp.h"
-#include "json11.hpp"
 #include "msgflo.h"
 
+using namespace std;
+
 namespace msgflo {
-
-using std::string;
-
-class Engine;
-class Participant;
 
 class MsgFloAmqpHandler : public AMQP::TcpHandler {
     virtual void onConnected(AMQP::TcpConnection *connection) {
@@ -31,27 +26,28 @@ class MsgFloAmqpHandler : public AMQP::TcpHandler {
     }
 };
 
-class Engine {
+class AmqpEngine : public Engine, public std::enable_shared_from_this<AmqpEngine> {
     friend class Participant;
 
 public:
-    Engine(Participant *p, const string &url)
-        : handler()
+    AmqpEngine(Participant *p, const string &url)
+        : Engine()
+        , handler()
         , connection(&handler, AMQP::Address(""))
         , channel(&connection)
         , participant(p)
     {
 //        handler.connect(o.host, o.port);
         channel.setQos(1); // TODO: is this prefech?
-        participant->_engine = this;
+        setEngine(participant, shared_from_this());
     }
 
-    void start() {
+    void start() override {
 
-        for (const auto &p : participant->definition.inports ) {
+        for (const auto &p : participant->definition()->inports ) {
             setupInport(p);
         }
-        for (const auto &p : participant->definition.outports ) {
+        for (const auto &p : participant->definition()->outports ) {
             setupOutport(p);
         }
 
@@ -60,13 +56,13 @@ public:
         ioService.run();
     }
 
-    void stop() {
+    void stop() override {
 
     }
 
 private:
     void sendParticipant() {
-        std::string data = json11::Json(participant->definition).dump();
+        std::string data = json11::Json(participant->definition()).dump();
         AMQP::Envelope env(data);
         channel.publish("", "fbp", env);
     }
@@ -89,25 +85,25 @@ private:
                 msg.deliveryTag = deliveryTag;
                 std::string err;
                 msg.json = json11::Json::parse(body, err);
-                this->participant->process(p.id, msg);
+                process(this->participant, p.id, msg);
             });
 
     }
 
-private:
+public:
     // Interfaces used by Participant
-    void send(std::string port, const Message &msg) {
-        const std::string exchange = Definition::queueForPort(participant->definition.outports, port);
+    void send(std::string port, Message &msg) override {
+        const std::string exchange = Definition::queueForPort(participant->definition()->outports, port);
         const std::string data = msg.json.dump();
         AMQP::Envelope env(data);
         std::cout <<" Sending on " << exchange << " :" << data << std::endl;
         channel.publish(exchange, "", env);
     }
 
-    void ack(const Message &msg) {
+    void ack(Message msg) override {
         channel.ack(msg.deliveryTag);
     }
-    void nack(const Message &msg) {
+    void nack(Message msg) override {
         // channel.nack(msg.deliveryTag); // FIXME: implement
     }
 
@@ -136,5 +132,8 @@ void Participant::nack(Message msg) {
     _engine->nack(msg);
 }
 
-} // namespace msgflo;
+shared_ptr<Engine> createEngine(Participant *participant, const std::string &url) {
+    return make_shared<AmqpEngine>(participant, url);
+}
 
+} // namespace msgflo;
