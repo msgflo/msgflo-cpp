@@ -1,3 +1,4 @@
+#include <atomic>
 #include <iostream>
 #include <algorithm>
 #include <thread>
@@ -5,6 +6,8 @@
 #include <boost/algorithm/string.hpp>
 
 #include "msgflo.h"
+
+using namespace std;
 
 class Repeat : public msgflo::Participant
 {
@@ -36,11 +39,25 @@ private:
     }
 };
 
-int main(int argc, const char **argv)
+atomic_bool run(true);
+
+int main(int argc, char **argv)
 {
+    if (argc != 2) {
+        cerr << "usage: " << argv[0] << " [<ampq url> | <mqtt url>]" << endl;
+        return EXIT_FAILURE;
+    }
+
     Repeat repeater("repeat");
     auto engine{msgflo::createEngine(&repeater, argv[1])};
 
     std::cout << " [*] Waiting for messages. To exit press CTRL-C" << std::endl;
-    return 0;
+
+    while (run) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+
+        cout << "Connected: " << (engine->connected() ? "yes" : "no") << endl;
+    }
+
+    return EXIT_SUCCESS;
 }

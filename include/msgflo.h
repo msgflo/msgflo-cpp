@@ -142,16 +142,13 @@ private:
 
 class Engine {
 public:
-    virtual void start() = 0;
-
-    virtual void stop() = 0;
-
     virtual void send(std::string port, Message &msg) = 0;
 
     virtual void ack(Message msg) = 0;
 
     virtual void nack(Message msg) = 0;
 
+    virtual bool connected() = 0;
 protected:
     void setEngine(Participant *participant, std::shared_ptr<Engine> e) {
         participant->_engine = e;
