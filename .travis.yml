@@ -12,6 +12,7 @@ before_install:
 - sudo apt-get install libboost1.55-all-dev
 - sudo apt-get install pkg-config cmake openssl libc-ares-dev
 install:
+- export CPP=g++-4.8
 - wget http://mosquitto.org/files/source/mosquitto-1.3.1.tar.gz
 - tar xzf mosquitto-1.3.1.tar.gz
 - cd mosquitto-1.3.1
@@ -19,9 +20,13 @@ install:
 - sudo make install
 - cd ..
 - npm install
+- mkdir build/
+- cd build
+- cmake ..
+- make -j4
+- cd -
 before_script:
 - mosquitto -d
-- make CPP=g++-4.8 EXTRA_LDFLAGS=-L/usr/lib/x86_64-linux-gnu/
 script:
 - npm test
 
