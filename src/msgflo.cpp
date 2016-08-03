@@ -27,6 +27,27 @@ void Participant::nack(Message msg) {
     _engine->nack(msg);
 }
 
+class DiscoveryMessage {
+public:
+    DiscoveryMessage(const Definition &def)
+        : definition(def)
+    {
+    }
+
+    json11::Json to_json() const {
+        using namespace json11;
+
+        return Json::object {
+                {"protocol",  "discovery"},
+                {"command",  "participant"},
+                {"payload", definition.to_json() },
+        };
+    }
+
+private:
+    Definition definition;
+};
+
 class AmqpEngine final : public Engine {
 
 public:
@@ -189,7 +210,7 @@ protected:
 
     virtual void on_connect(int rc) override {
         auto d = _participant->definition();
-        string data = json11::Json(*d).dump();
+        string data = json11::Json(DiscoveryMessage(*d)).dump();
         cout << "data: " << data << endl;
         client.publish(nullptr, "fbp", 0, false, data);
 
