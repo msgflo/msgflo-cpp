@@ -223,8 +223,8 @@ class mqtt_client : public waitable, private mqtt_lib {
 public:
     mqtt_client(mqtt_event_listener *event_listener, const string &host, const int port, const int keep_alive,
                 const string &client_id, const bool clean_session) :
-            event_listener(event_listener), host(host), port(port), connecting_(false), connected_(false),
-            keep_alive(keep_alive), unacked_messages_(0) {
+        event_listener(event_listener), host(host), port(port), connecting_(false), connected_(false),
+        keep_alive(keep_alive), unacked_messages_(0) {
         const char *id = nullptr;
 
         if (!client_id.empty()) {
@@ -365,7 +365,7 @@ private:
     void on_publish_wrapper(int message_id) {
         guard lock(this_mutex);
 
-        event_listener->on_msg("message ACKed, message id=" + message_id);
+        event_listener->on_msg("message ACKed, message id=" + to_string(message_id));
         unacked_messages_--;
 
         event_listener->on_publish(message_id);

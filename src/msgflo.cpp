@@ -1,8 +1,6 @@
 #include "msgflo.h"
 
-#include <string>
 #include <iostream>
-#include <algorithm>
 #include <thread>
 #include <boost/asio/io_service.hpp>
 #include "amqpcpp.h"
@@ -60,7 +58,7 @@ public:
 
 private:
     void sendParticipant() {
-        std::string data = json11::Json(participant->definition()).dump();
+        std::string data = json11::Json(*participant->definition()).dump();
         AMQP::Envelope env(data);
         channel.publish("", "fbp", env);
     }
@@ -185,9 +183,14 @@ public:
     }
 
 protected:
+    virtual void on_msg(const string &msg) override {
+        cout << "mqtt: " << msg << endl;
+    }
+
     virtual void on_connect(int rc) override {
         auto d = _participant->definition();
-        string data = json11::Json(d).dump();
+        string data = json11::Json(*d).dump();
+        cout << "data: " << data << endl;
         client.publish(nullptr, "/fbp", 0, false, data);
 
         for (auto &p : d->inports) {
