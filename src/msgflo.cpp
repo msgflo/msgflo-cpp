@@ -1,3 +1,4 @@
+#include <string>
 #include <iostream>
 #include <algorithm>
 #include <thread>
@@ -27,35 +28,6 @@ void Participant::nack(Message msg) {
     if (!_engine) return;
     _engine->nack(msg);
 }
-
-class MsgFloAmqpHandler : public AMQP::TcpHandler {
-public:
-    bool connected;
-
-protected:
-
-    void onConnected(AMQP::TcpConnection *connection) {
-        static_cast<void>(connection);
-        connected = true;
-    }
-
-    void onError(AMQP::TcpConnection *connection, const char *message) {
-        static_cast<void>(connection);
-        static_cast<void>(message);
-        connected = false;
-    }
-
-    void onClosed(AMQP::TcpConnection *connection) {
-        static_cast<void>(connection);
-        connected = false;
-    }
-
-    void monitor(AMQP::TcpConnection *connection, int fd, int flags) {
-        static_cast<void>(connection);
-        static_cast<void>(fd);
-        static_cast<void>(flags);
-    }
-};
 
 class AmqpEngine final : public Engine, public std::enable_shared_from_this<AmqpEngine> {
 
@@ -138,12 +110,45 @@ public:
     }
 
 private:
+    class MsgFloAmqpHandler : public AMQP::TcpHandler {
+    public:
+        bool connected;
+
+    protected:
+
+        void onConnected(AMQP::TcpConnection *connection) {
+            static_cast<void>(connection);
+            connected = true;
+        }
+
+        void onError(AMQP::TcpConnection *connection, const char *message) {
+            static_cast<void>(connection);
+            static_cast<void>(message);
+            connected = false;
+        }
+
+        void onClosed(AMQP::TcpConnection *connection) {
+            static_cast<void>(connection);
+            connected = false;
+        }
+
+        void monitor(AMQP::TcpConnection *connection, int fd, int flags) {
+            static_cast<void>(connection);
+            static_cast<void>(fd);
+            static_cast<void>(flags);
+        }
+    };
+
+private:
     boost::asio::io_service ioService;
     MsgFloAmqpHandler handler;
     AMQP::TcpConnection connection;
     AMQP::TcpChannel channel;
     Participant *participant;
 };
+
+// We're all into threads
+using msg_flo_mqtt_client = mqtt_client<trygvis::mqtt_support::mqtt_client_personality::threaded>;
 
 class MosquittoEngine final : public Engine {
 public:
@@ -184,7 +189,7 @@ private:
 
     listener _listener;
     const Participant *_participant;
-    mqtt_client<trygvis::mqtt_support::mqtt_client_personality::threaded> client;
+    msg_flo_mqtt_client client;
 };
 
 shared_ptr<Engine> createEngine(Participant *participant, const std::string &url) {
@@ -208,18 +213,79 @@ shared_ptr<Engine> createEngine(Participant *participant, const std::string &url
             if (i_u != string::npos) {
                 username = up.substr(0, i_u);
                 password = up.substr(i_u + 1);
+            } else {
+                username = up;
             }
+            cout << "username: " << username << endl;
+            cout << "password: " << password << endl;
+
             s = s.substr(i_up + 1);
             cout << "s: " << s << endl;
         }
 
-        host = s;
-//        cout << "host: " << host << endl;
-//        cout << "username: " << username << endl;
-//        cout << "password: " << password << endl;
-//        cout << "client_id: " << client_id << endl;
-//        cout << "keep_alive: " << keep_alive << endl;
-//        cout << "clean_session: " << clean_session << endl;
+        auto i_q = s.find('?');
+
+        if (i_q != string::npos) {
+            host = s.substr(0, i_q);
+            s = s.substr(i_q + 1);
+            cout << "s: " << s << endl;
+
+            while(!s.empty()) {
+                auto i_amp = s.find('&');
+
+                string kv;
+                if (i_amp == string::npos) {
+                    kv = s;
+                    s = "";
+                } else {
+                    kv = s.substr(0, i_amp);
+                }
+                cout << "kv: " << kv << endl;
+
+                auto i_eq = kv.find('=');
+
+                string key, value;
+                if (i_eq != string::npos) {
+                    key = kv.substr(0, i_eq);
+                    value = kv.substr(i_eq + 1);
+                } else {
+                    key = kv;
+                }
+
+                if (key == "keepAlive") {
+                    try {
+                        auto v = stoul(value);
+                        if (v > INT_MAX) {
+                            throw invalid_argument("too big");
+                        }
+                        keep_alive = static_cast<int>(v);
+                    } catch (invalid_argument &e) {
+                        throw invalid_argument("Bad keepAlive argument, must be a number greater than zero.");
+                    } catch (out_of_range &e) {
+                        throw invalid_argument("Bad keepAlive argument, must be a number greater than zero.");
+                    }
+                } else if (key == "clientId") {
+                    client_id = value;
+                } else if (key == "cleanSession") {
+                    clean_session = !(value == "0" || value == "no" || value == "false");
+                } else {
+                    // ignore unknown keys
+                }
+
+                if (i_amp == string::npos) {
+                    break;
+                }
+                s = s.substr(i_amp + 1);
+                cout << "s: " << s << endl;
+            }
+        } else {
+            host = s;
+        }
+        cout << "host: " << host << endl;
+
+        cout << "client_id: " << client_id << endl;
+        cout << "keep_alive: " << keep_alive << endl;
+        cout << "clean_session: " << clean_session << endl;
 
         return make_shared<MosquittoEngine>(participant, host, port, keep_alive, client_id, clean_session);
     } else if (boost::starts_with(url, "amqp://")) {

@@ -150,9 +150,44 @@ enum mqtt_client_personality {
 
 class mqtt_event_listener {
 public:
-    virtual void on_msg(const string &str) = 0;
-
     virtual ~mqtt_event_listener() = default;
+
+    virtual void on_msg(const string &msg) {
+        static_cast<void>(msg);
+    }
+
+    virtual void on_connect(int rc) {
+        static_cast<void>(rc);
+    }
+
+    virtual void on_disconnect(bool was_connecting, bool was_connected, int rc) {
+        static_cast<void>(was_connecting);
+        static_cast<void>(was_connected);
+        static_cast<void>(rc);
+    }
+
+    virtual void on_publish(int mid) {
+        static_cast<void>(mid);
+    }
+
+    virtual void on_message(const struct mosquitto_message *message) {
+        static_cast<void>(message);
+    }
+
+    virtual void on_subscribe(int mid, int qos_count, const int *granted_qos) {
+        static_cast<void>(mid);
+        static_cast<void>(qos_count);
+        static_cast<void>(granted_qos);
+    }
+
+    virtual void on_unsubscribe(int mid) {
+        static_cast<void>(mid);
+    }
+
+    virtual void on_log(int level, const char *str) {
+        static_cast<void>(level);
+        static_cast<void>(str);
+    }
 };
 
 template<mqtt_client_personality personality>
@@ -308,7 +343,7 @@ private:
         } else {
             event_listener->on_msg("Could not connect: " + error_to_string(rc));
         }
-        on_connect(rc);
+        event_listener->on_connect(rc);
 
         cv.notify_all();
     }
@@ -322,7 +357,7 @@ private:
         connecting_ = connected_ = false;
         unacked_messages_ = 0;
 
-        on_disconnect(was_connecting, was_connected, rc);
+        event_listener->on_disconnect(was_connecting, was_connected, rc);
 
         cv.notify_all();
     }
@@ -333,31 +368,31 @@ private:
         event_listener->on_msg("message ACKed, message id=" + message_id);
         unacked_messages_--;
 
-        on_publish(message_id);
+        event_listener->on_publish(message_id);
 
         cv.notify_all();
     }
 
     void on_message_wrapper(const struct mosquitto_message *message) {
         guard lock(this_mutex);
-        on_message(message);
+        event_listener->on_message(message);
     }
 
     void on_subscribe_wrapper(int mid, int qos_count, const int *granted_qos) {
         static_cast<void>(qos_count);
         guard lock(this_mutex);
-        on_subscribe(mid, mid, granted_qos);
+        event_listener->on_subscribe(mid, mid, granted_qos);
     }
 
     void on_unsubscribe_wrapper(int mid) {
         guard lock(this_mutex);
-        on_unsubscribe(mid);
+        event_listener->on_unsubscribe(mid);
     }
 
     void on_log_wrapper(int level, const char *str) {
         guard lock(this_mutex);
 
-        on_log(level, str);
+        event_listener->on_log(level, str);
     }
 
 public:
@@ -420,44 +455,6 @@ private:
         assert_success("mosquitto_loop", rc);
     }
 
-    // -------------------------------------------
-    // Callbacks
-    // -------------------------------------------
-
-protected:
-    virtual void on_connect(int rc) {
-        static_cast<void>(rc);
-    }
-
-    virtual void on_disconnect(bool was_connecting, bool was_connected, int rc) {
-        static_cast<void>(was_connecting);
-        static_cast<void>(was_connected);
-        static_cast<void>(rc);
-    }
-
-    virtual void on_publish(int mid) {
-        static_cast<void>(mid);
-    }
-
-    virtual void on_message(const struct mosquitto_message *message) {
-        static_cast<void>(message);
-    }
-
-    virtual void on_subscribe(int mid, int qos_count, const int *granted_qos) {
-        static_cast<void>(mid);
-        static_cast<void>(qos_count);
-        static_cast<void>(granted_qos);
-    }
-
-    virtual void on_unsubscribe(int mid) {
-        static_cast<void>(mid);
-    }
-
-    virtual void on_log(int level, const char *str) {
-        static_cast<void>(level);
-        static_cast<void>(str);
-    }
-
 private:
     static void on_connect_cb(struct mosquitto *, void *self, int rc) {
         static_cast<mqtt_client *>(self)->on_connect_wrapper(rc);
@@ -488,7 +485,7 @@ private:
     }
 };
 
-}
-}
+} // namespace mqtt_support
+} // namespace trygvis
 
 #endif
