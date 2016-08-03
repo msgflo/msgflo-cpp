@@ -11,21 +11,42 @@ using namespace trygvis::mqtt_support;
 
 namespace msgflo {
 
-void Participant::send(std::string port, Message &msg)
-{
-    if (!_engine) return;
-    _engine->send(port, msg);
-}
+class AbstractMessage : public Message {
+protected:
+    AbstractMessage(const char *data, const uint64_t len) : _data(data), _len(len) {}
 
-void Participant::ack(Message msg) {
-    if (!_engine) return;
-    _engine->ack(msg);
-}
+    virtual ~AbstractMessage() {};
 
-void Participant::nack(Message msg) {
-    if (!_engine) return;
-    _engine->nack(msg);
-}
+    const char *_data;
+    const uint64_t _len;
+
+public:
+    virtual void data(const char **data, uint64_t *len) override {
+        *data = this->_data;
+        *len = this->_len;
+    }
+
+    virtual json11::Json asJson() override {
+        string err;
+        return json11::Json::parse(_data, err);
+    }
+};
+
+//void Participant::send(std::string port, const json11::Json &msg)
+//{
+//    if (!_engine) return;
+//    _engine->send(port, msg);
+//}
+//
+//void Participant::ack(Message msg) {
+//    if (!_engine) return;
+//    _engine->ack(msg);
+//}
+//
+//void Participant::nack(Message msg) {
+//    if (!_engine) return;
+//    _engine->nack(msg);
+//}
 
 class DiscoveryMessage {
 public:
@@ -49,6 +70,19 @@ private:
 };
 
 class AmqpEngine final : public Engine {
+    struct AmqpMessage final : public AbstractMessage {
+        AmqpMessage(const char *data, uint64_t len, uint64_t deliveryTag)
+            : AbstractMessage(data, len), _deliveryTag(deliveryTag) {
+        }
+
+        uint64_t _deliveryTag;
+
+        virtual void ack() override {
+        }
+
+        virtual void nack() override {
+        }
+    };
 
 public:
     AmqpEngine(Participant *p, const string &url)
@@ -100,32 +134,30 @@ private:
 
                 const auto body = message.message();
                 std::cout<<" [x] Received "<<body<<std::endl;
-                Message msg;
-                msg.deliveryTag = deliveryTag;
+                AmqpMessage msg(message.body(), message.bodySize(), deliveryTag);
                 std::string err;
-                msg.json = json11::Json::parse(body, err);
-                process(this->participant, p.id, msg);
+                process(this->participant, p.id, &msg);
             });
 
     }
 
 public:
-    // Interfaces used by Participant
-    void send(std::string port, Message &msg) override {
-        const std::string exchange = Definition::queueForPort(participant->definition()->outports, port);
-        const std::string data = msg.json.dump();
-        AMQP::Envelope env(data);
-        std::cout <<" Sending on " << exchange << " :" << data << std::endl;
+    void send(string port, const json11::Json &msg) override {
+        const string exchange = Definition::queueForPort(participant->definition()->outports, port);
+        const string data = msg.dump();
+        AMQP::Envelope env(data.c_str(), data.size());
+        cout << " Sending on " << exchange << " :" << data << endl;
         channel.publish(exchange, "", env);
     }
 
-    void ack(const Message &msg) override {
-        channel.ack(msg.deliveryTag);
-    }
-    void nack(const Message &msg) override {
-        static_cast<void>(msg);
-        // channel.nack(msg.deliveryTag); // FIXME: implement
-    }
+//    void ack(const Message *msg) override {
+//        channel.ack(msg.deliveryTag);
+//    }
+//
+//    void nack(const Message *msg) override {
+//        static_cast<void>(msg);
+//         channel.nack(msg.deliveryTag);
+//    }
 
 private:
     class MsgFloAmqpHandler : public AMQP::TcpHandler {
@@ -169,6 +201,21 @@ private:
 using msg_flo_mqtt_client = mqtt_client<trygvis::mqtt_support::mqtt_client_personality::threaded>;
 
 class MosquittoEngine final : public Engine, protected mqtt_event_listener {
+
+    struct MosquittoMessage final : public AbstractMessage {
+        MosquittoMessage(const struct mosquitto_message *m)
+            : AbstractMessage(static_cast<char *>(m->payload), static_cast<uint64_t>(m->payloadlen)), _mid(m->mid) {
+        }
+
+        int _mid;
+
+        virtual void ack() override {
+        }
+
+        virtual void nack() override {
+        }
+    };
+
 public:
     MosquittoEngine(const EngineConfig config, Participant *participant, const string &host, const int port,
                     const int keep_alive, const string &client_id, const bool clean_session) :
@@ -181,22 +228,15 @@ public:
     virtual ~MosquittoEngine() {
     }
 
-    void send(string port, Message &msg) override {
+    void send(string port, const json11::Json &msg) override {
         auto queue = Definition::queueForPort(_participant->definition()->outports, port);
 
-        if(queue.empty()) {
+        if (queue.empty()) {
             throw std::domain_error("No such port: " + port);
         }
 
-        client.publish(nullptr, queue, 0, false, msg.json.dump());
-    }
-
-    void ack(const Message &msg) override {
-        static_cast<void>(msg);
-    }
-
-    void nack(const Message &msg) override {
-        static_cast<void>(msg);
+        string json = msg.dump();
+        client.publish(nullptr, queue, 0, false, static_cast<int>(json.size()), json.c_str());
     }
 
     bool connected() override {
@@ -212,20 +252,32 @@ protected:
         cout << "mqtt: " << msg << endl;
     }
 
+    virtual void on_message(const struct mosquitto_message *message) override {
+        string topic = message->topic;
+        for (auto &p : _participant->definition()->inports) {
+            if (p.queue == topic) {
+                MosquittoMessage m(message);
+
+                // p.id should p.role
+                process(_participant, p.id, &m);
+            }
+        }
+    }
+
     virtual void on_connect(int rc) override {
         auto d = _participant->definition();
         string data = json11::Json(DiscoveryMessage(*d)).dump();
-        cout << "data: " << data << endl;
         client.publish(nullptr, "fbp", 0, false, data);
 
         for (auto &p : d->inports) {
+            on_msg("Connecting port " + p.id + " to mqtt topic " + p.queue);
             client.subscribe(nullptr, p.queue, 0);
         }
     }
 
 private:
     const bool _debugOutput;
-    const Participant *_participant;
+    Participant *_participant;
     msg_flo_mqtt_client client;
 };
 

@@ -1,8 +1,8 @@
 #include <atomic>
 #include <iostream>
 #include <algorithm>
-#include <thread>
 #include <chrono>
+#include <thread>
 #include <boost/algorithm/string.hpp>
 
 #include "msgflo.h"
@@ -29,13 +29,11 @@ public:
     }
 
 private:
-    virtual void process(std::string port, msgflo::Message msg)
+    virtual void process(std::string port, msgflo::Message *msg)
     {
         std::cout << "Repeat.process()" << std::endl;
-        msgflo::Message out;
-        out.json = msg.json;
-        send("out", out);
-        ack(msg);
+        _engine->send("out", msg->asJson());
+        msg->ack();
     }
 };
 
@@ -49,15 +47,14 @@ int main(int argc, char **argv)
     }
 
     Repeat repeater("repeat");
-    msgflo::EngineConfig config;
+    msgflo::EngineConfig config(&repeater);
     config.url(argv[1]);
     auto engine = msgflo::createEngine(config);
 
     std::cout << " [*] Waiting for messages. To exit press CTRL-C" << std::endl;
 
     while (run) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-
+        std::this_thread::sleep_for(std::chrono::seconds(10));
         cout << "Connected: " << (engine->connected() ? "yes" : "no") << endl;
     }
 

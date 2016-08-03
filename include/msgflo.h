@@ -37,7 +37,7 @@ public:
         if (!p.queue.empty()) {
             return p;
         }
-        p.queue = role + "." + boost::to_upper_copy<std::string>(p.id);
+        p.queue = "/" + role + "." + boost::to_upper_copy<std::string>(p.id);
         return p;
     }
 
@@ -97,15 +97,17 @@ public:
     std::vector<Port> outports;
 };
 
-struct Message {
-    enum Type {
-        Json,
-        // Binary, // TODO: support binary type also
-    };
+class Message {
+public:
+    virtual  ~Message() {};
 
-    uint64_t deliveryTag;
-    json11::Json json;
-    Type type = Json;
+    virtual json11::Json asJson() = 0;
+
+    virtual void data(const char **_data, uint64_t *len) = 0;
+
+    virtual void ack() = 0;
+
+    virtual void nack() = 0;
 };
 
 class Engine;
@@ -123,29 +125,30 @@ public:
 
 protected:
     /* Receiving messages. Override in subclass */
-    virtual void process(std::string port, Message msg) = 0;
+    virtual void process(std::string port, Message *msg) = 0;
 
     /* Sending messages */
-    void send(std::string port, Message &msg);
+//    void send(std::string port, Message *msg);
 
     // ACK/NACK
-    void ack(Message msg);
+//    void ack(Message msg);
+//
+//    void nack(Message msg);
 
-    void nack(Message msg);
+    Engine* _engine{};
 
 private:
     const std::string role;
     const Definition _definition;
-    Engine* _engine{};
 };
 
 class Engine {
 public:
-    virtual void send(std::string port, Message &msg) = 0;
+    virtual void send(std::string port, const json11::Json &msg) = 0;
 
-    virtual void ack(const Message &msg) = 0;
-
-    virtual void nack(const Message &msg) = 0;
+//    virtual void ack(const Message &msg) = 0;
+//
+//    virtual void nack(const Message &msg) = 0;
 
     virtual bool connected() = 0;
 protected:
@@ -153,14 +156,14 @@ protected:
         participant->_engine = e;
     }
 
-    void process(Participant *participant, std::string port, Message msg) {
+    void process(Participant *participant, std::string port, Message *msg) {
         participant->process(port, msg);
     }
 };
 
 class EngineConfig {
 public:
-    EngineConfig() : _debugOutput(true), _participant(nullptr) {
+    EngineConfig(Participant *participant) : _debugOutput(true), _participant(participant) {
     }
 
     void debugOutput(bool on) {
