@@ -136,7 +136,7 @@ protected:
 private:
     const std::string role;
     const Definition _definition;
-    std::shared_ptr<Engine> _engine{};
+    Engine* _engine{};
 };
 
 class Engine {
@@ -149,7 +149,7 @@ public:
 
     virtual bool connected() = 0;
 protected:
-    void setEngine(Participant *participant, std::shared_ptr<Engine> e) {
+    void setEngine(Participant *participant, Engine* e) {
         participant->_engine = e;
     }
 

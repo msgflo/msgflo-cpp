@@ -29,7 +29,7 @@ void Participant::nack(Message msg) {
     _engine->nack(msg);
 }
 
-class AmqpEngine final : public Engine, public std::enable_shared_from_this<AmqpEngine> {
+class AmqpEngine final : public Engine {
 
 public:
     AmqpEngine(Participant *p, const string &url)
@@ -40,7 +40,7 @@ public:
         , participant(p)
     {
         channel.setQos(1); // TODO: is this prefech?
-        setEngine(participant, shared_from_this());
+        setEngine(participant, this);
 
         for (const auto &port : participant->definition()->inports) {
             setupInport(port);
@@ -149,12 +149,12 @@ private:
 // We're all into threads
 using msg_flo_mqtt_client = mqtt_client<trygvis::mqtt_support::mqtt_client_personality::threaded>;
 
-class MosquittoEngine final : public Engine, public enable_shared_from_this<MosquittoEngine>, protected mqtt_event_listener {
+class MosquittoEngine final : public Engine, protected mqtt_event_listener {
 public:
     MosquittoEngine(Participant *participant, const string &host, const int port, const int keep_alive,
                     const string &client_id, const bool clean_session) :
             _participant(participant), client(this, host, port, keep_alive, client_id, clean_session) {
-        setEngine(participant, shared_from_this());
+        setEngine(participant, this);
 
         client.connect();
     }
