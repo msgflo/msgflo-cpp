@@ -2,3 +2,11 @@ build/
 node_modules/
 .idea
 *.iml
+examples/Makefile
+CMakeFiles
+cmake_install.cmake
+COPYONLY
+CMakeCache.txt
+COPYONLY
+MsgFlo
+amqpcpp_project-prefix/
