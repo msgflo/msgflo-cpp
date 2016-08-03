@@ -191,7 +191,7 @@ protected:
         auto d = _participant->definition();
         string data = json11::Json(*d).dump();
         cout << "data: " << data << endl;
-        client.publish(nullptr, "/fbp", 0, false, data);
+        client.publish(nullptr, "fbp", 0, false, data);
 
         for (auto &p : d->inports) {
             client.subscribe(nullptr, p.queue, 0);
