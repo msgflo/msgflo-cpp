@@ -51,13 +51,18 @@ int main(int argc, char **argv)
     if (argc >= 3) {
         config.url(argv[2]);
     }
+    config.debugOutput(false);
+
     auto engine = msgflo::createEngine(config);
 
-    std::cout << " [*] Waiting for messages. To exit press CTRL-C" << std::endl;
-
     while (run) {
-        std::this_thread::sleep_for(std::chrono::seconds(10));
-        cout << "Connected: " << (engine->connected() ? "yes" : "no") << endl;
+        if (engine->connected()) {
+            cout << "[*] Connected, waiting for messages. To exit press CTRL-C " << endl;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (!engine->connected()) {
+            cout << "Not connected, retrying. To exit press CTRL-C " << endl;
+        }
     }
 
     return EXIT_SUCCESS;

@@ -4,12 +4,12 @@ chai = require 'chai' unless chai
 heterogenous = require '../node_modules/msgflo/spec/heterogenous.coffee'
 
 participants =
-  'C++Repeat': [path.join __dirname, '..', 'build', './examples/repeat']
+  'C++Repeat': [ path.join(__dirname, '..', 'build', './examples/repeat'), '/public/repeater2' ]
 
 # Note: most require running an external broker service
 transports =
-  #'MQTT': 'mqtt://localhost'
-  'AMQP': 'amqp://localhost'
+  'MQTT': 'mqtt://localhost'
+  #'AMQP': 'amqp://localhost'
 
 transportTests = (g, address) ->
 
@@ -21,7 +21,7 @@ transportTests = (g, address) ->
 
   names = Object.keys g.commands
   names.forEach (name) ->
-    heterogenous.testParticipant g, name
+    heterogenous.testParticipant g, name, { broker: address, timeout: 70*1000 }
 
 
 describe 'Participants', ->
