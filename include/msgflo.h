@@ -98,10 +98,9 @@ public:
 };
 
 struct Message {
-    // TODO: support binary type also
     enum Type {
         Json,
-        Binary
+        // Binary, // TODO: support binary type also
     };
 
     uint64_t deliveryTag;

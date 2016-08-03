@@ -411,7 +411,7 @@ public:
     void publish(int *mid, const string &topic, int qos, bool retain, const string &s) {
         auto len = s.length();
 
-        auto int_max = std::numeric_limits<int>::max();
+        static const auto int_max = std::numeric_limits<int>::max();
 
         if (len > int_max) {
             len = static_cast<decltype(len)>(int_max);

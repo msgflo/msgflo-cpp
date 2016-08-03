@@ -39,7 +39,6 @@ public:
         , channel(&connection)
         , participant(p)
     {
-//        handler.connect(o.host, o.port);
         channel.setQos(1); // TODO: is this prefech?
         setEngine(participant, shared_from_this());
 
@@ -150,21 +149,27 @@ private:
 // We're all into threads
 using msg_flo_mqtt_client = mqtt_client<trygvis::mqtt_support::mqtt_client_personality::threaded>;
 
-class MosquittoEngine final : public Engine {
+class MosquittoEngine final : public Engine, public enable_shared_from_this<MosquittoEngine>, protected mqtt_event_listener {
 public:
     MosquittoEngine(Participant *participant, const string &host, const int port, const int keep_alive,
                     const string &client_id, const bool clean_session) :
-            _listener(), _participant(participant), client(&_listener, host, port, keep_alive, client_id, clean_session) {
+            _participant(participant), client(this, host, port, keep_alive, client_id, clean_session) {
+        setEngine(participant, shared_from_this());
+
         client.connect();
     }
 
-    ~MosquittoEngine() {
-        client.disconnect();
+    virtual ~MosquittoEngine() {
     }
 
     void send(string port, Message &msg) override {
-        static_cast<void>(port);
-        static_cast<void>(msg);
+        auto queue = Definition::queueForPort(_participant->definition()->outports, port);
+
+        if(queue.empty()) {
+            throw std::domain_error("No such port: " + port);
+        }
+
+        client.publish(nullptr, queue, 0, false, msg.json.dump());
     }
 
     void ack(const Message &msg) override {
@@ -179,15 +184,18 @@ public:
         return client.connected();
     }
 
-private:
-    class listener : public mqtt_event_listener {
-    public:
-        virtual void on_msg(const string &str) override {
-            cerr << "mqtt: " << str << endl;
-        }
-    };
+protected:
+    virtual void on_connect(int rc) override {
+        auto d = _participant->definition();
+        string data = json11::Json(d).dump();
+        client.publish(nullptr, "/fbp", 0, false, data);
 
-    listener _listener;
+        for (auto &p : d->inports) {
+            client.subscribe(nullptr, p.queue, 0);
+        }
+    }
+
+private:
     const Participant *_participant;
     msg_flo_mqtt_client client;
 };
