@@ -306,7 +306,6 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
         bool clean_session = true;
 
         string s = url.substr(7);
-        cout << "s: " << s << endl;
         auto i_up = s.find('@');
 
         if (i_up != string::npos) {
@@ -386,11 +385,13 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
         } else {
             host = s;
         }
-        cout << "host: " << host << endl;
 
-        cout << "client_id: " << client_id << endl;
-        cout << "keep_alive: " << keep_alive << endl;
-        cout << "clean_session: " << clean_session << endl;
+        if (config.debugOutput()) {
+            cout << "host: " << host << endl;
+            cout << "client_id: " << client_id << endl;
+            cout << "keep_alive: " << keep_alive << endl;
+            cout << "clean_session: " << clean_session << endl;
+        }
 
         return make_shared<MosquittoEngine>(config, participant, host, port, keep_alive, client_id, clean_session);
     } else if (boost::starts_with(url, "amqp://")) {
