@@ -286,17 +286,9 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
     string url = config.url();
 
     if (url.empty()) {
-        for (char **e = environ; e; e++) {
-            string s = *e;
-            auto i = s.find('=');
-            if (i != string::npos) {
-                auto key = s.substr(0, i);
-                auto value = s.substr(i + 1);
-
-                if (key == "MSGFLO_BROKER") {
-                    url = value;
-                }
-            }
+        const char* broker = std::getenv("MSGFLO_BROKER");
+        if (broker) {
+            url = std::string(broker);
         }
     }
 

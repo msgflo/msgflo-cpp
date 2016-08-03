@@ -41,14 +41,16 @@ atomic_bool run(true);
 
 int main(int argc, char **argv)
 {
-    if (argc != 2) {
-        cerr << "usage: " << argv[0] << " [<ampq url> | <mqtt url>]" << endl;
-        return EXIT_FAILURE;
+    std::string role = "repeat";
+    if (argc >= 2) {
+        role = argv[1];
     }
 
-    Repeat repeater("repeat");
+    Repeat repeater(role);
     msgflo::EngineConfig config(&repeater);
-    config.url(argv[1]);
+    if (argc >= 3) {
+        config.url(argv[2]);
+    }
     auto engine = msgflo::createEngine(config);
 
     std::cout << " [*] Waiting for messages. To exit press CTRL-C" << std::endl;
