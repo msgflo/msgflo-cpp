@@ -4,7 +4,7 @@ chai = require 'chai' unless chai
 heterogenous = require '../node_modules/msgflo/spec/heterogenous.coffee'
 
 participants =
-  'C++Repeat': [path.join __dirname, '..', 'build', './repeat-cpp']
+  'C++Repeat': [path.join __dirname, '..', 'build', './examples/repeat']
 
 # Note: most require running an external broker service
 transports =
