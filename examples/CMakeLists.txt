@@ -1,8 +1,8 @@
 # If we're not included by the msgflo project, find the sources the normal way. This is what you should do in your
 # application
-if (${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
+if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     cmake_minimum_required(VERSION 3.5)
-    project(msgflo_cpp_examples)
+    project(msgflo_cpp_examples CXX)
 
     find_package(MsgFlo)
     set(msgflo_lib MsgFlo::msgflo)

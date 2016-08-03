@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(msgflo_cppX)
+project(msgflo_cpp CXX)
 
 set(MSGFLO_VERSION 1.0)
 
