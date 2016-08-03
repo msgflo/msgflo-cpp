@@ -49,7 +49,9 @@ int main(int argc, char **argv)
     }
 
     Repeat repeater("repeat");
-    auto engine(msgflo::createEngine(&repeater, argv[1]));
+    msgflo::EngineConfig config;
+    config.url(argv[1]);
+    auto engine = msgflo::createEngine(config);
 
     std::cout << " [*] Waiting for messages. To exit press CTRL-C" << std::endl;
 

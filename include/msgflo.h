@@ -158,6 +158,41 @@ protected:
     }
 };
 
-std::shared_ptr<Engine> createEngine(Participant *participant, const std::string &url);
+class EngineConfig {
+public:
+    EngineConfig() : _debugOutput(true), _participant(nullptr) {
+    }
+
+    void debugOutput(bool on) {
+        _debugOutput = on;
+    };
+
+    bool debugOutput() const {
+        return _debugOutput;
+    }
+
+    void url(const std::string &url) {
+        _url = url;
+    };
+
+    std::string url() const {
+        return _url;
+    }
+
+    void participant(Participant *participant) {
+        _participant = participant;
+    }
+
+    Participant *participant() const {
+        return _participant;
+    }
+
+private:
+    bool _debugOutput;
+    std::string _url;
+    Participant *_participant;
+};
+
+std::shared_ptr<Engine> createEngine(const EngineConfig config);
 
 } // namespace msgflo

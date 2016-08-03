@@ -170,9 +170,9 @@ using msg_flo_mqtt_client = mqtt_client<trygvis::mqtt_support::mqtt_client_perso
 
 class MosquittoEngine final : public Engine, protected mqtt_event_listener {
 public:
-    MosquittoEngine(Participant *participant, const string &host, const int port, const int keep_alive,
-                    const string &client_id, const bool clean_session) :
-            _participant(participant), client(this, host, port, keep_alive, client_id, clean_session) {
+    MosquittoEngine(const EngineConfig config, Participant *participant, const string &host, const int port,
+                    const int keep_alive, const string &client_id, const bool clean_session) :
+        _debugOutput(config.debugOutput()), _participant(participant), client(this, host, port, keep_alive, client_id, clean_session) {
         setEngine(participant, this);
 
         client.connect();
@@ -205,6 +205,10 @@ public:
 
 protected:
     virtual void on_msg(const string &msg) override {
+        if (!_debugOutput) {
+            return;
+        }
+
         cout << "mqtt: " << msg << endl;
     }
 
@@ -220,11 +224,36 @@ protected:
     }
 
 private:
+    const bool _debugOutput;
     const Participant *_participant;
     msg_flo_mqtt_client client;
 };
 
-shared_ptr<Engine> createEngine(Participant *participant, const std::string &url) {
+shared_ptr<Engine> createEngine(const EngineConfig config) {
+
+    string url = config.url();
+
+    if (url.empty()) {
+        for (char **e = environ; e; e++) {
+            string s = *e;
+            auto i = s.find('=');
+            if (i != string::npos) {
+                auto key = s.substr(0, i);
+                auto value = s.substr(i + 1);
+
+                if (key == "MSGFLO_BROKER") {
+                    url = value;
+                }
+            }
+        }
+    }
+
+    Participant *participant = config.participant();
+
+    if (participant == nullptr) {
+        throw domain_error("Bad config: participant is not set.");
+    }
+
     if (boost::starts_with(url, "mqtt://")) {
         string host, username, password;
         int port = 1883;
@@ -262,7 +291,7 @@ shared_ptr<Engine> createEngine(Participant *participant, const std::string &url
             s = s.substr(i_q + 1);
             cout << "s: " << s << endl;
 
-            while(!s.empty()) {
+            while (!s.empty()) {
                 auto i_amp = s.find('&');
 
                 string kv;
@@ -319,7 +348,7 @@ shared_ptr<Engine> createEngine(Participant *participant, const std::string &url
         cout << "keep_alive: " << keep_alive << endl;
         cout << "clean_session: " << clean_session << endl;
 
-        return make_shared<MosquittoEngine>(participant, host, port, keep_alive, client_id, clean_session);
+        return make_shared<MosquittoEngine>(config, participant, host, port, keep_alive, client_id, clean_session);
     } else if (boost::starts_with(url, "amqp://")) {
         return make_shared<AmqpEngine>(participant, url);
     }
