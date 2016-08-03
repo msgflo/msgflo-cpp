@@ -38,7 +38,8 @@ add_library(msgflo src/msgflo.cpp src/mqtt_support.cpp src/mqtt_support.h ${JSON
 target_include_directories(msgflo
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/json11>
-    PRIVATE ${Boost_INCLUDE_DIR}
+    # Boost could made private with little effort, migth be worth.
+    PUBLIC ${Boost_INCLUDE_DIR}
     PRIVATE ${amqp_install}/include
     PRIVATE ${mosquitto_INCLUDE_DIRECTORY}
     PRIVATE src)

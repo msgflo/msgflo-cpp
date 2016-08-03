@@ -1,12 +1,12 @@
+#include "msgflo.h"
+
 #include <string>
 #include <iostream>
 #include <algorithm>
 #include <thread>
-#include <boost/algorithm/string.hpp>
 #include <boost/asio/io_service.hpp>
 #include "amqpcpp.h"
 #include "mqtt_support.h"
-#include "msgflo.h"
 
 using namespace std;
 using namespace trygvis::mqtt_support;
