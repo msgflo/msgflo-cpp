@@ -177,10 +177,6 @@ public:
 private:
     class listener : public mqtt_event_listener {
     public:
-        listener() {
-            cerr << "woot" << endl;
-        }
-
         virtual void on_msg(const string &str) override {
             cerr << "mqtt: " << str << endl;
         }

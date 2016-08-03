@@ -49,6 +49,7 @@ string error_to_string(int rc) {
     return string(mosquitto_strerror(rc));
 }
 
+__attribute__((unused))
 vector<string> mqtt_tokenize_topic(string path);
 
 class waitable {
@@ -266,8 +267,8 @@ public:
     void connect() {
         guard lock(this_mutex);
 
-        event_listener->on_msg(
-                "Connecting to " + host + ":" + to_string(port) + ", keep_alive=" + to_string(keep_alive));
+        auto msg = "Connecting to " + host + ":" + to_string(port) + ", keep_alive=" + to_string(keep_alive);
+        event_listener->on_msg(msg);
 
         if (connecting_ || connected_) {
             disconnect();
@@ -361,7 +362,8 @@ private:
 
 public:
     void disconnect() {
-        event_listener->on_msg("Disconnecting, connected: " + string(connected() ? "yes" : "no"));
+        auto msg = "Disconnecting, connected: " + connected() ? "yes" : "no";
+        event_listener->on_msg(msg);
         int rc = mosquitto_disconnect(mosquitto);
         event_listener->on_msg("mosquitto_disconnect: " + error_to_string(rc));
     }
