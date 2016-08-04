@@ -11,7 +11,7 @@ include(ExternalProject)
 ExternalProject_Add(amqpcpp_project
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/amqpcpp
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND make -j4
+    BUILD_COMMAND make CPP=${CMAKE_CXX_COMPILER} LD=${CMAKE_CXX_COMPILER}
     BUILD_IN_SOURCE TRUE
     INSTALL_COMMAND make install PREFIX=${amqp_install}
     )
