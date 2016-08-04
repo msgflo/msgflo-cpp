@@ -10,9 +10,11 @@ msgflo-cpp is written in C++11 and is built on top of [AMQP-CPP](https://github.
 
 ## Status
 
-*Experimental*
+*Working prototype*
 
-* Basic support for setting up and running Participants with AMQP/RabbitMQ transport
+* Basic Participant support, sends discover
+* Supports AMQP/RabbitMQ and MQTT transports
+* Not used in production yet
 
 ## Usage
 
@@ -26,3 +28,11 @@ See [./examples/repeat.cpp](./examples/repeat.cpp)
 ## License
 
 MIT, see [./LICENSE](./LICENSE)
+
+## TODO
+
+0.1
+
+* Fix missing port identifier in process()
+* Remove boost dependency
+* AMQP: Implement NACK
