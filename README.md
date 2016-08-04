@@ -18,8 +18,10 @@ msgflo-cpp is written in C++11 and is built on top of [AMQP-CPP](https://github.
 
 See [./examples/repeat.cpp](./examples/repeat.cpp)
 
+    mkdir build
+    cmake ..
     make
-    ./build/repeat-cpp
+    ./examples/repeat
 
 ## License
 

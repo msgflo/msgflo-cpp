@@ -1,51 +1,48 @@
-
-
+#include <atomic>
 #include <iostream>
 #include <algorithm>
-#include <thread>
 #include <chrono>
+#include <thread>
 #include <boost/algorithm/string.hpp>
 
-#include "msgflo.cpp"
+#include "msgflo.h"
 
-class Repeat : public msgflo::Participant
+using namespace std;
+
+atomic_bool run(true);
+
+int main(int argc, char **argv)
 {
-    struct Def : public msgflo::Definition {
-        Def(void) : msgflo::Definition()
-        {
-            component = "C++Repeat";
-            label = "Repeats input on outport unchanged";
-            outports = {
-                { "out", "any", "" }
-            };
-        }
+    std::string role = "repeat";
+    if (argc >= 2) {
+        role = argv[1];
+    }
+
+    msgflo::Definition def;
+    def.component = "C++Repeat";
+    def.label = "Repeats input on outport unchanged";
+    def.outports = {
+        { "out", "any", "" }
     };
+    def.role = role;
 
-public:
-    Repeat(std::string role)
-        : msgflo::Participant(role, Def())
-    {
+    msgflo::EngineConfig config;
+    if (argc >= 3) {
+        config.url(argv[2]);
     }
+    config.debugOutput(true);
 
-private:
-    virtual void process(std::string port, msgflo::Message msg)
-    {
-        std::cout << "Repeat.process()" << std::endl;
-        msgflo::Message out;
-        out.json = msg.json;
-        send("out", out);
-        ack(msg);
-    }
-};
+    auto engine = msgflo::createEngine(config);
 
-int main(void)
-{
-    // TODO: allow to set broker info, name on commandline or with envvar
-    Repeat repeater("repeat");
-    msgflo::ConnectionOptions o;
-    msgflo::Engine engine(&repeater, o);
+    msgflo::Participant *participant = engine->registerParticipant(def, [&](msgflo::Message *msg) {
+        auto payload = msg->asJson();
+        std::cout << "Got message:" << endl << payload.dump() << std::endl;
+        participant->send("out", payload);
+        msg->ack();
+    });
 
-    std::cout << " [*] Waiting for messages. To exit press CTRL-C" << std::endl;
-    engine.start();
-    return 0;
+    std::cout << "C++Repeat started" << endl;
+    engine->launch();
+
+    return EXIT_SUCCESS;
 }
