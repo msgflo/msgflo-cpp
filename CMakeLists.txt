@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(msgflo_cpp CXX)
 
-set(MSGFLO_VERSION 1.0)
+set(MSGFLO_VERSION 0.0.3)
 
 # AMQP-CPP configuration
 
