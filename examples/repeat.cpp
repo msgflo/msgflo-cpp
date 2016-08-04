@@ -41,6 +41,7 @@ int main(int argc, char **argv)
         msg->ack();
     });
 
+    std::cout << "C++Repeat started" << endl;
     engine->launch();
 
     return EXIT_SUCCESS;

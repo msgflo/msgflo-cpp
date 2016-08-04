@@ -9,7 +9,7 @@ participants =
 # Note: most require running an external broker service
 transports =
   'MQTT': 'mqtt://localhost'
-  #'AMQP': 'amqp://localhost'
+  'AMQP': 'amqp://localhost'
 
 transportTests = (g, address) ->
 
