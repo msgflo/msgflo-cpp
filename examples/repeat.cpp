@@ -9,34 +9,6 @@
 
 using namespace std;
 
-class Repeat : public msgflo::Participant
-{
-    struct Def : public msgflo::Definition {
-        Def(void) : msgflo::Definition()
-        {
-            component = "C++Repeat";
-            label = "Repeats input on outport unchanged";
-            outports = {
-                { "out", "any", "" }
-            };
-        }
-    };
-
-public:
-    Repeat(std::string role)
-        : msgflo::Participant(role, Def())
-    {
-    }
-
-private:
-    virtual void process(std::string port, msgflo::Message *msg)
-    {
-        std::cout << "Repeat.process()" << std::endl;
-        _engine->send("out", msg->asJson());
-        msg->ack();
-    }
-};
-
 atomic_bool run(true);
 
 int main(int argc, char **argv)
@@ -46,24 +18,30 @@ int main(int argc, char **argv)
         role = argv[1];
     }
 
-    Repeat repeater(role);
-    msgflo::EngineConfig config(&repeater);
+    msgflo::Definition def;
+    def.component = "C++Repeat";
+    def.label = "Repeats input on outport unchanged";
+    def.outports = {
+        { "out", "any", "" }
+    };
+    def.role = role;
+
+    msgflo::EngineConfig config;
     if (argc >= 3) {
         config.url(argv[2]);
     }
-    config.debugOutput(false);
+    config.debugOutput(true);
 
     auto engine = msgflo::createEngine(config);
 
-    while (run) {
-        if (engine->connected()) {
-            cout << "[*] Connected, waiting for messages. To exit press CTRL-C " << endl;
-        }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        if (!engine->connected()) {
-            cout << "Not connected, retrying. To exit press CTRL-C " << endl;
-        }
-    }
+    msgflo::Participant *participant = engine->registerParticipant(def, [&](msgflo::Message *msg) {
+        auto payload = msg->asJson();
+        std::cout << "Got message:" << endl << payload.dump() << std::endl;
+        participant->send("out", payload);
+        msg->ack();
+    });
+
+    engine->launch();
 
     return EXIT_SUCCESS;
 }

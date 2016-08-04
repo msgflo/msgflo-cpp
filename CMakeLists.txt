@@ -26,6 +26,15 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/json11/"
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost COMPONENTS REQUIRED system)
 
+# libev
+find_path(libev_INCLUDE_DIRECTORY ev.h)
+find_library(libev_LIB ev)
+
+if (NOT libev_INCLUDE_DIRECTORY OR NOT libev_LIB)
+    message(FATAL_ERROR "Could not find header and/or library for libev")
+endif ()
+
+# Mosquitto
 find_path(mosquitto_INCLUDE_DIRECTORY mosquitto.h)
 find_library(mosquitto_LIB mosquitto)
 
@@ -40,6 +49,7 @@ target_include_directories(msgflo
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/json11>
     # Boost could made private with little effort, migth be worth.
     PUBLIC ${Boost_INCLUDE_DIR}
+    PRIVATE ${libev_INCLUDE_DIRECTORY}
     PRIVATE ${amqp_install}/include
     PRIVATE ${mosquitto_INCLUDE_DIRECTORY}
     PRIVATE src)
@@ -48,7 +58,9 @@ target_include_directories(msgflo
 target_compile_options(msgflo PRIVATE -Wall -Wextra -Wno-unused-parameter)
 
 target_link_libraries(msgflo
-    PRIVATE ${Boost_LIBRARIES} ${amqp_install}/lib/libamqpcpp.a ${mosquitto_LIB})
+    PRIVATE ${Boost_LIBRARIES}
+    PRIVATE ${amqp_install}/lib/libamqpcpp.a
+    PRIVATE ${mosquitto_LIB})
 target_compile_features(msgflo PUBLIC cxx_range_for)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/"
     DESTINATION "include")

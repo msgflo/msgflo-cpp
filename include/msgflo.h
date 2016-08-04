@@ -24,37 +24,6 @@ struct Definition {
     };
 
 public:
-    static std::string queueForPort(const std::vector<Port> &ports, std::string id) {
-        for (const auto &p : ports) {
-            if (p.id == id) {
-                return p.queue;
-            }
-        }
-        return "";
-    }
-
-    static Port &addDefaultQueue(Port &p, std::string role) {
-        if (!p.queue.empty()) {
-            return p;
-        }
-        p.queue = "/" + role + "." + boost::to_upper_copy<std::string>(p.id);
-        return p;
-    }
-
-    static Definition instantiate(Definition &d, std::string role) {
-        d.id = role + std::to_string(rand());
-        d.role = role;
-
-        for (auto &p : d.inports) {
-            addDefaultQueue(p, role);
-        }
-        for (auto &p : d.outports) {
-            addDefaultQueue(p, role);
-        }
-        return d;
-    }
-
-public:
     Definition() :
             inports{
                     Port{"in", "any", ""}},
@@ -99,7 +68,7 @@ public:
 
 class Message {
 public:
-    virtual  ~Message() {};
+    virtual ~Message() {};
 
     virtual json11::Json asJson() = 0;
 
@@ -113,57 +82,31 @@ public:
 class Engine;
 
 class Participant {
-    friend class Engine;
-
 public:
-    Participant(std::string _role, Definition _def)
-            : role(_role), _definition(Definition::instantiate(_def, role)) {}
+    virtual ~Participant() = default;
 
-    const Definition *definition() const {
-        return &_definition;
-    }
+    virtual void send(std::string port, const json11::Json &json) = 0;
 
-protected:
-    /* Receiving messages. Override in subclass */
-    virtual void process(std::string port, Message *msg) = 0;
+    virtual void send(std::string port, const std::string &string) = 0;
 
-    /* Sending messages */
-//    void send(std::string port, Message *msg);
-
-    // ACK/NACK
-//    void ack(Message msg);
-//
-//    void nack(Message msg);
-
-    Engine* _engine{};
+    virtual void send(std::string port, const char *data, uint64_t len) = 0;
 
 private:
-    const std::string role;
-    const Definition _definition;
 };
+
+using MessageHandler = std::function<void(Message *)>;
 
 class Engine {
 public:
-    virtual void send(std::string port, const json11::Json &msg) = 0;
+    virtual Participant *registerParticipant(const Definition &definition, MessageHandler handler) = 0;
 
-//    virtual void ack(const Message &msg) = 0;
-//
-//    virtual void nack(const Message &msg) = 0;
-
-    virtual bool connected() = 0;
+    virtual void launch() = 0;
 protected:
-    void setEngine(Participant *participant, Engine* e) {
-        participant->_engine = e;
-    }
-
-    void process(Participant *participant, std::string port, Message *msg) {
-        participant->process(port, msg);
-    }
 };
 
 class EngineConfig {
 public:
-    EngineConfig(Participant *participant) : _debugOutput(true), _participant(participant) {
+    EngineConfig() : _debugOutput(true) {
     }
 
     void debugOutput(bool on) {
@@ -182,18 +125,9 @@ public:
         return _url;
     }
 
-    void participant(Participant *participant) {
-        _participant = participant;
-    }
-
-    Participant *participant() const {
-        return _participant;
-    }
-
 private:
     bool _debugOutput;
     std::string _url;
-    Participant *_participant;
 };
 
 std::shared_ptr<Engine> createEngine(const EngineConfig config);

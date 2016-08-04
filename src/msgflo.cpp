@@ -2,14 +2,73 @@
 
 #include <iostream>
 #include <thread>
-#include <boost/asio/io_service.hpp>
 #include "amqpcpp.h"
+#include "amqpcpp/libev.h"
 #include "mqtt_support.h"
 
 using namespace std;
 using namespace trygvis::mqtt_support;
 
 namespace msgflo {
+
+class DiscoveryMessage {
+public:
+    DiscoveryMessage(const Definition &def)
+        : definition(def) {
+    }
+
+    json11::Json to_json() const {
+        using namespace json11;
+
+        return Json::object {
+                {"protocol",  "discovery"},
+                {"command",  "participant"},
+                {"payload", definition.to_json() },
+        };
+    }
+
+private:
+    Definition definition;
+};
+
+template<typename Engine_t>
+struct ParticipantRegistrationT : public Participant {
+    Engine_t *engine;
+    const std::vector<Definition::Port> inports;
+    const std::vector<Definition::Port> outports;
+    const string id;
+    const MessageHandler handler;
+    const DiscoveryMessage discoveryMessage;
+
+    ParticipantRegistrationT(Engine_t *engine, const Definition &definition, const MessageHandler &handler)
+        : engine(engine), inports(definition.inports), outports(definition.outports), id(generateId(definition)),
+          handler(handler), discoveryMessage(definition) {}
+
+    virtual void send(std::string port, const json11::Json &json) override {
+        send(port, json.dump());
+    }
+
+    virtual void send(std::string port, const std::string &string) override {
+        send(port, string.c_str(), string.size());
+    }
+
+    virtual void send(std::string port, const char *data, uint64_t len) override {
+        engine->send(this, port, data, len);
+    }
+
+    const Definition::Port *findOutPort(const string &id) const {
+        for (auto &p: outports) {
+            if (p.id == id) {
+                return &p;
+            }
+        }
+        return nullptr;
+    }
+
+    static string generateId(const Definition &d) {
+        return d.role + std::to_string(rand());
+    }
+};
 
 class AbstractMessage : public Message {
 protected:
@@ -28,179 +87,142 @@ public:
 
     virtual json11::Json asJson() override {
         string err;
-        return json11::Json::parse(_data, err);
+        string str(_data, _len);
+        auto x = json11::Json::parse(str, err);
+        if (!err.empty()) {
+            cerr << "_data=" << _data << endl;
+            cerr << "_len=" << _len << endl;
+            throw domain_error("Could not parse JSON body: " + err + ", payload: " + str);
+        }
+        return x;
     }
 };
 
-//void Participant::send(std::string port, const json11::Json &msg)
-//{
-//    if (!_engine) return;
-//    _engine->send(port, msg);
-//}
-//
-//void Participant::ack(Message msg) {
-//    if (!_engine) return;
-//    _engine->ack(msg);
-//}
-//
-//void Participant::nack(Message msg) {
-//    if (!_engine) return;
-//    _engine->nack(msg);
-//}
+template<typename EngineType>
+class AbstractEngine {
+protected:
+    using ParticipantRegistration = ParticipantRegistrationT<EngineType>;
 
-class DiscoveryMessage {
-public:
-    DiscoveryMessage(const Definition &def)
-        : definition(def)
-    {
+    Definition validateDefinitionFromUser(const Definition &definition) {
+        Definition d(definition);
+        for (auto &port : d.inports) {
+            if (port.queue.empty()) {
+                port.queue = generateQueueName(definition, port);
+            }
+        }
+        for (auto &port : d.outports) {
+            if (port.queue.empty()) {
+                port.queue = generateQueueName(definition, port);
+            }
+        }
+
+        return d;
     }
 
-    json11::Json to_json() const {
-        using namespace json11;
+    virtual string generateQueueName(const Definition &d, const Definition::Port &) = 0;
 
-        return Json::object {
-                {"protocol",  "discovery"},
-                {"command",  "participant"},
-                {"payload", definition.to_json() },
-        };
-    }
-
-private:
-    Definition definition;
+    vector<ParticipantRegistration> registrations;
 };
 
-class AmqpEngine final : public Engine {
+class AmqpEngine final : public Engine, protected AbstractEngine<AmqpEngine> {
+
     struct AmqpMessage final : public AbstractMessage {
-        AmqpMessage(const char *data, uint64_t len, uint64_t deliveryTag)
-            : AbstractMessage(data, len), _deliveryTag(deliveryTag) {
+        AmqpMessage(AMQP::Channel &channel, uint64_t deliveryTag, const AMQP::Message &m)
+            : AbstractMessage(m.body(), m.bodySize()), _deliveryTag(deliveryTag), channel(channel) {
         }
 
         uint64_t _deliveryTag;
+        AMQP::Channel &channel;
 
         virtual void ack() override {
+            channel.ack(_deliveryTag);
         }
 
         virtual void nack() override {
+            throw runtime_error("nack is not implemented for AMQP");
         }
     };
 
 public:
-    AmqpEngine(Participant *p, const string &url)
-        : Engine()
-        , handler()
-        , connection(&handler, AMQP::Address(url))
-        , channel(&connection)
-        , participant(p)
-    {
+    AmqpEngine(const string &url)
+        : Engine(), loop(EV_DEFAULT), handler(loop), connection(&handler, AMQP::Address(url)), channel(&connection) {
         channel.setQos(1); // TODO: is this prefech?
-        setEngine(participant, this);
 
-        for (const auto &port : participant->definition()->inports) {
-            setupInport(port);
-        }
-        for (const auto &port : participant->definition()->outports) {
-            setupOutport(port);
-        }
+        channel.onReady([&]() {
+            for(auto &r: registrations) {
+                for (const auto &port : r.inports) {
+                    setupInPort(r, port);
+                }
+                for (const auto &port : r.outports) {
+                    setupOutPort(port);
+                }
 
-        sendParticipant();
-
-        ioService.run();
+                sendDiscoveryMessage(r);
+            }
+        });
     }
 
-    bool connected() override {
-        return handler.connected;
+    virtual Participant *registerParticipant(const Definition &definition, MessageHandler handler) override {
+        Definition d = validateDefinitionFromUser(definition);
+        registrations.emplace_back(this, d, handler);
+        return &registrations[registrations.size() - 1];
+    }
+
+    virtual void launch() override {
+        ev_run(loop, 0);
+    }
+
+protected:
+    string generateQueueName(const Definition &d, const Definition::Port &port) override {
+        return d.role + "." + boost::to_upper_copy<std::string>(port.id);
     }
 
 private:
-    void sendParticipant() {
-        std::string data = json11::Json(*participant->definition()).dump();
+    void sendDiscoveryMessage(const ParticipantRegistration &r) {
+        string data = json11::Json(r.discoveryMessage).dump();
         AMQP::Envelope env(data);
         channel.publish("", "fbp", env);
     }
 
-    void setupOutport(const Definition::Port &p) {
+    void setupOutPort(const Definition::Port &p) {
         channel.declareExchange(p.queue, AMQP::fanout);
     }
 
-    void setupInport(const Definition::Port &p) {
-
-        channel.declareQueue(p.queue, AMQP::durable);
-        channel.consume(p.queue).onReceived(
-            [p, this](const AMQP::Message &message,
-                       uint64_t deliveryTag,
-                       bool redelivered)
-            {
-                static_cast<void>(redelivered);
-
-                const auto body = message.message();
-                std::cout<<" [x] Received "<<body<<std::endl;
-                AmqpMessage msg(message.body(), message.bodySize(), deliveryTag);
-                std::string err;
-                process(this->participant, p.id, &msg);
+    void setupInPort(const ParticipantRegistration &r, const Definition::Port &port) {
+        channel.declareQueue(port.queue, AMQP::durable);
+        channel.consume(port.queue).onReceived(
+            [r, this](const AMQP::Message &message,
+                      uint64_t deliveryTag,
+                      bool redelivered) {
+                AmqpMessage msg(channel, deliveryTag, message);
+                r.handler(&msg);
             });
-
     }
 
 public:
-    void send(string port, const json11::Json &msg) override {
-        const string exchange = Definition::queueForPort(participant->definition()->outports, port);
-        const string data = msg.dump();
-        AMQP::Envelope env(data.c_str(), data.size());
-        cout << " Sending on " << exchange << " :" << data << endl;
-        channel.publish(exchange, "", env);
+
+    void send(const ParticipantRegistration *r, const string &portName, const char *data, uint64_t size) {
+        auto p = r->findOutPort(portName);
+
+        if (p == nullptr) {
+            throw domain_error("Unknown out port: " + portName);
+        }
+
+        AMQP::Envelope env(data, size);
+        cout << " Sending on id=" << p->id << ", queue=" << p->queue << endl;
+        channel.publish(p->queue, "", env);
     }
 
-//    void ack(const Message *msg) override {
-//        channel.ack(msg.deliveryTag);
-//    }
-//
-//    void nack(const Message *msg) override {
-//        static_cast<void>(msg);
-//         channel.nack(msg.deliveryTag);
-//    }
-
 private:
-    class MsgFloAmqpHandler : public AMQP::TcpHandler {
-    public:
-        bool connected;
-
-    protected:
-
-        void onConnected(AMQP::TcpConnection *connection) {
-            static_cast<void>(connection);
-            connected = true;
-        }
-
-        void onError(AMQP::TcpConnection *connection, const char *message) {
-            static_cast<void>(connection);
-            static_cast<void>(message);
-            connected = false;
-        }
-
-        void onClosed(AMQP::TcpConnection *connection) {
-            static_cast<void>(connection);
-            connected = false;
-        }
-
-        void monitor(AMQP::TcpConnection *connection, int fd, int flags) {
-            static_cast<void>(connection);
-            static_cast<void>(fd);
-            static_cast<void>(flags);
-        }
-    };
-
-private:
-    boost::asio::io_service ioService;
-    MsgFloAmqpHandler handler;
+    struct ev_loop *loop;
+    AMQP::LibEvHandler handler;
     AMQP::TcpConnection connection;
     AMQP::TcpChannel channel;
-    Participant *participant;
 };
 
-// We're all into threads
-using msg_flo_mqtt_client = mqtt_client<trygvis::mqtt_support::mqtt_client_personality::threaded>;
+using msg_flo_mqtt_client = mqtt_client<trygvis::mqtt_support::mqtt_client_personality::polling>;
 
-class MosquittoEngine final : public Engine, protected mqtt_event_listener {
+class MosquittoEngine final : public Engine, protected mqtt_event_listener, protected AbstractEngine<MosquittoEngine> {
 
     struct MosquittoMessage final : public AbstractMessage {
         MosquittoMessage(const struct mosquitto_message *m)
@@ -210,40 +232,53 @@ class MosquittoEngine final : public Engine, protected mqtt_event_listener {
         int _mid;
 
         virtual void ack() override {
+            cerr << "MosquittoMessage.ack() is not implemented" << endl;
         }
 
         virtual void nack() override {
+            cerr << "MosquittoMessage.nack() is not implemented" << endl;
         }
     };
 
 public:
-    MosquittoEngine(const EngineConfig config, Participant *participant, const string &host, const int port,
+    MosquittoEngine(const EngineConfig config, const string &host, const int port,
                     const int keep_alive, const string &client_id, const bool clean_session) :
-        _debugOutput(config.debugOutput()), _participant(participant), client(this, host, port, keep_alive, client_id, clean_session) {
-        setEngine(participant, this);
-
+        _debugOutput(config.debugOutput()), client(this, host, port, keep_alive, client_id, clean_session) {
         client.connect();
     }
 
     virtual ~MosquittoEngine() {
     }
 
-    void send(string port, const json11::Json &msg) override {
-        auto queue = Definition::queueForPort(_participant->definition()->outports, port);
-
-        if (queue.empty()) {
-            throw std::domain_error("No such port: " + port);
-        }
-
-        string json = msg.dump();
-        client.publish(nullptr, queue, 0, false, static_cast<int>(json.size()), json.c_str());
+    virtual Participant *registerParticipant(const Definition &definition, MessageHandler handler) override {
+        Definition d = validateDefinitionFromUser(definition);
+        registrations.emplace_back(this, d, handler);
+        return &registrations[registrations.size() - 1];
     }
 
-    bool connected() override {
-        return client.connected();
+    void send(const ParticipantRegistration *r, const string &portName, const char *data, uint64_t len) {
+        auto port = r->findOutPort(portName);
+
+        if (port == nullptr) {
+            throw domain_error("No such port: " + portName);
+        }
+
+        client.publish(nullptr, port->queue, 0, false, static_cast<int>(len), data);
+    }
+
+    virtual void launch() override {
+        run = true;
+
+        while (run) {
+            client.poll();
+        }
     }
 
 protected:
+    string generateQueueName(const Definition &d, const Definition::Port &port) override {
+        return "/" + d.role + "." + boost::to_upper_copy<std::string>(port.id);
+    }
+
     virtual void on_msg(const string &msg) override {
         if (!_debugOutput) {
             return;
@@ -254,31 +289,34 @@ protected:
 
     virtual void on_message(const struct mosquitto_message *message) override {
         string topic = message->topic;
-        for (auto &p : _participant->definition()->inports) {
-            if (p.queue == topic) {
-                MosquittoMessage m(message);
+        for (auto &r : registrations) {
+            for (auto &p : r.inports) {
+                if (p.queue == topic) {
+                    MosquittoMessage m(message);
 
-                // p.id should p.role
-                process(_participant, p.id, &m);
+                    r.handler(&m);
+                }
             }
         }
     }
 
     virtual void on_connect(int rc) override {
-        auto d = _participant->definition();
-        string data = json11::Json(DiscoveryMessage(*d)).dump();
-        client.publish(nullptr, "fbp", 0, false, data);
+        for(auto &r: registrations) {
+            for (auto &p : r.inports) {
+                on_msg("Connecting port " + p.id + " to mqtt topic " + p.queue);
+                client.subscribe(nullptr, p.queue, 0);
+            }
 
-        for (auto &p : d->inports) {
-            on_msg("Connecting port " + p.id + " to mqtt topic " + p.queue);
-            client.subscribe(nullptr, p.queue, 0);
+            string data = json11::Json(r.discoveryMessage).dump();
+            client.publish(nullptr, "fbp", 0, false, data);
         }
     }
 
 private:
     const bool _debugOutput;
-    Participant *_participant;
+    atomic_bool run;
     msg_flo_mqtt_client client;
+    vector<ParticipantRegistration> registrations;
 };
 
 shared_ptr<Engine> createEngine(const EngineConfig config) {
@@ -288,14 +326,8 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
     if (url.empty()) {
         const char* broker = std::getenv("MSGFLO_BROKER");
         if (broker) {
-            url = std::string(broker);
+            url = broker;
         }
-    }
-
-    Participant *participant = config.participant();
-
-    if (participant == nullptr) {
-        throw domain_error("Bad config: participant is not set.");
     }
 
     if (boost::starts_with(url, "mqtt://")) {
@@ -393,9 +425,9 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
             cout << "clean_session: " << clean_session << endl;
         }
 
-        return make_shared<MosquittoEngine>(config, participant, host, port, keep_alive, client_id, clean_session);
+        return make_shared<MosquittoEngine>(config, host, port, keep_alive, client_id, clean_session);
     } else if (boost::starts_with(url, "amqp://")) {
-        return make_shared<AmqpEngine>(participant, url);
+        return make_shared<AmqpEngine>(url);
     }
 
     throw std::runtime_error("Unsupported URL scheme: " + url);
