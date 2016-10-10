@@ -71,6 +71,7 @@ public:
     virtual ~Message() {};
 
     virtual json11::Json asJson() = 0;
+    virtual std::string asString() = 0;
 
     virtual void data(const char **_data, uint64_t *len) = 0;
 

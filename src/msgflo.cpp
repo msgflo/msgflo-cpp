@@ -85,6 +85,11 @@ public:
         *len = this->_len;
     }
 
+    virtual std::string asString() override {
+        string str(_data, _len);
+        return str;
+    }
+
     virtual json11::Json asJson() override {
         string err;
         string str(_data, _len);
