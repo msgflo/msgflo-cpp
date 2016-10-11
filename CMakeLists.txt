@@ -60,7 +60,8 @@ target_compile_options(msgflo PRIVATE -Wall -Wextra -Wno-unused-parameter)
 target_link_libraries(msgflo
     PRIVATE ${Boost_LIBRARIES}
     PRIVATE ${amqp_install}/lib/libamqpcpp.a
-    PRIVATE ${mosquitto_LIB})
+    PRIVATE ${mosquitto_LIB}
+    PRIVATE ${libev_LIB})
 target_compile_features(msgflo PUBLIC cxx_range_for)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/"
     DESTINATION "include")
