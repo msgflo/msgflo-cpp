@@ -2,7 +2,6 @@
 
 #include <string>
 #include <memory>
-#include <boost/algorithm/string.hpp>
 #include "json11.hpp"
 
 namespace msgflo {
