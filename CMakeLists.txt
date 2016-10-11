@@ -22,11 +22,7 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/json11/"
     DESTINATION "include"
     FILES_MATCHING PATTERN "*.hpp")
 
-# Boost
-set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost COMPONENTS REQUIRED system)
-
-# libev
+# libev, used by AMQP
 find_path(libev_INCLUDE_DIRECTORY ev.h)
 find_library(libev_LIB ev)
 
@@ -47,8 +43,6 @@ add_library(msgflo src/msgflo.cpp src/mqtt_support.cpp src/mqtt_support.h ${JSON
 target_include_directories(msgflo
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/json11>
-    # Boost could made private with little effort, migth be worth.
-    PUBLIC ${Boost_INCLUDE_DIR}
     PRIVATE ${libev_INCLUDE_DIRECTORY}
     PRIVATE ${amqp_install}/include
     PRIVATE ${mosquitto_INCLUDE_DIRECTORY}
@@ -58,7 +52,6 @@ target_include_directories(msgflo
 target_compile_options(msgflo PRIVATE -Wall -Wextra -Wno-unused-parameter)
 
 target_link_libraries(msgflo
-    PRIVATE ${Boost_LIBRARIES}
     PRIVATE ${amqp_install}/lib/libamqpcpp.a
     PRIVATE ${mosquitto_LIB}
     PRIVATE ${libev_LIB})

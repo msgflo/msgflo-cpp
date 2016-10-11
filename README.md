@@ -34,5 +34,4 @@ MIT, see [./LICENSE](./LICENSE)
 0.1
 
 * Fix missing port identifier in process()
-* Remove boost dependency
 * AMQP: Implement NACK

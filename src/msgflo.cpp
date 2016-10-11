@@ -11,6 +11,19 @@ using namespace trygvis::mqtt_support;
 
 namespace msgflo {
 
+std::string string_to_upper_copy(const std::string &str) {
+    std::string ret;
+    ret.resize(str.size());
+    for (uint i=0; i<str.size(); i++) {
+        ret[i] = toupper(str[i]);
+    }
+    return ret;
+}
+
+bool string_starts_with(const std::string &str, const std::string &prefix) {
+    return str.substr(0, prefix.size()) == prefix;
+}
+
 class DiscoveryMessage {
 public:
     DiscoveryMessage(const Definition &def)
@@ -179,7 +192,7 @@ public:
 
 protected:
     string generateQueueName(const Definition &d, const Definition::Port &port) override {
-        return d.role + "." + boost::to_upper_copy<std::string>(port.id);
+        return d.role + "." + string_to_upper_copy(port.id);
     }
 
 private:
@@ -281,7 +294,7 @@ public:
 
 protected:
     string generateQueueName(const Definition &d, const Definition::Port &port) override {
-        return "/" + d.role + "." + boost::to_upper_copy<std::string>(port.id);
+        return "/" + d.role + "." + string_to_upper_copy(port.id);
     }
 
     virtual void on_msg(const string &msg) override {
@@ -335,7 +348,7 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
         }
     }
 
-    if (boost::starts_with(url, "mqtt://")) {
+    if (string_starts_with(url, "mqtt://")) {
         string host, username, password;
         int port = 1883;
         int keep_alive = 180;
@@ -431,7 +444,7 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
         }
 
         return make_shared<MosquittoEngine>(config, host, port, keep_alive, client_id, clean_session);
-    } else if (boost::starts_with(url, "amqp://")) {
+    } else if (string_starts_with(url, "amqp://")) {
         return make_shared<AmqpEngine>(url);
     }
 
