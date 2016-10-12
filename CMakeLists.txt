@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.0)
 project(msgflo_cpp CXX)
 
 set(MSGFLO_VERSION 0.0.3)
@@ -55,7 +55,6 @@ target_link_libraries(msgflo
     PRIVATE ${amqp_install}/lib/libamqpcpp.a
     PRIVATE ${mosquitto_LIB}
     PRIVATE ${libev_LIB})
-target_compile_features(msgflo PUBLIC cxx_range_for)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/"
     DESTINATION "include")
 
