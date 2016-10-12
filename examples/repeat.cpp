@@ -29,7 +29,6 @@ int main(int argc, char **argv)
     if (argc >= 3) {
         config.url(argv[2]);
     }
-    config.debugOutput(true);
 
     auto engine = msgflo::createEngine(config);
 

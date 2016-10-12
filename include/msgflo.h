@@ -106,7 +106,8 @@ protected:
 
 class EngineConfig {
 public:
-    EngineConfig() : _debugOutput(true) {
+    EngineConfig() : _debugOutput(false) {
+        _debugOutput = std::getenv("MSGFLO_CPP_DEBUG") ? true : false;
     }
 
     void debugOutput(bool on) {

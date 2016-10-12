@@ -29,6 +29,12 @@ See [./examples/repeat.cpp](./examples/repeat.cpp)
 
 MIT, see [./LICENSE](./LICENSE)
 
+## Debugging
+
+To enable debug logging, set the `MSGFLO_CPP_DEBUG` environment variable.
+
+    export MSGFLO_CPP_DEBUG=1
+
 ## TODO
 
 0.1
