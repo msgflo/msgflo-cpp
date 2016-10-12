@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0)
 project(msgflo_cpp CXX)
 
-set(MSGFLO_VERSION 0.0.3)
+set(MSGFLO_VERSION 0.0.4)
 
 # Specify C++11
 add_compile_options(-std=c++11)
