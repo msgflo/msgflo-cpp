@@ -3,8 +3,10 @@ project(msgflo_cpp CXX)
 
 set(MSGFLO_VERSION 0.0.3)
 
-# AMQP-CPP configuration
+# Specify C++11
+add_compile_options(-std=c++11)
 
+# AMQP-CPP configuration
 set(amqp_install ${CMAKE_CURRENT_BINARY_DIR}/thirdparty-install/amqpcpp)
 
 include(ExternalProject)
