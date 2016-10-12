@@ -11,5 +11,4 @@ else ()
 endif ()
 
 add_executable(repeat repeat.cpp)
-target_compile_features(repeat PUBLIC cxx_range_for)
 target_link_libraries(repeat PUBLIC ${msgflo_lib} ev pthread)
