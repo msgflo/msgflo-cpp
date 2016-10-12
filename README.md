@@ -10,7 +10,7 @@ and [json11](https://github.com/dropbox/json11).
 
 ## Status
 
-*Working prototype*
+*Minimally useful*
 
 * Basic Participant support, sends discover
 * Supports AMQP/RabbitMQ and MQTT transports
