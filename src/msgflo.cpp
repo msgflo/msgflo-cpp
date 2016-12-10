@@ -157,7 +157,7 @@ class AmqpEngine final : public Engine, protected AbstractEngine<AmqpEngine> {
         }
 
         virtual void nack() override {
-            throw runtime_error("nack is not implemented for AMQP");
+            channel.reject(_deliveryTag);
         }
     };
 
