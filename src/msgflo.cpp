@@ -243,18 +243,27 @@ using msg_flo_mqtt_client = mqtt_client<trygvis::mqtt_support::mqtt_client_perso
 class MosquittoEngine final : public Engine, protected mqtt_event_listener, protected AbstractEngine<MosquittoEngine> {
 
     struct MosquittoMessage final : public AbstractMessage {
-        MosquittoMessage(const struct mosquitto_message *m)
-            : AbstractMessage(static_cast<char *>(m->payload), static_cast<uint64_t>(m->payloadlen)), _mid(m->mid) {
+        MosquittoMessage(const struct mosquitto_message *m, bool d)
+            : AbstractMessage(static_cast<char *>(m->payload), static_cast<uint64_t>(m->payloadlen))
+            , _mid(m->mid)
+            , _debugOutput(d)
+        {
+
         }
 
         int _mid;
+        bool _debugOutput = false;
 
         virtual void ack() override {
-            cerr << "MosquittoMessage.ack() is not implemented" << endl;
+            if (_debugOutput) {
+                cerr << "MosquittoMessage.ack() is currently a no-op" << endl;
+            }
         }
 
         virtual void nack() override {
-            cerr << "MosquittoMessage.nack() is not implemented" << endl;
+            if (_debugOutput) {
+                cerr << "MosquittoMessage.nack() is currently a no-op" << endl;
+            }
         }
     };
 
@@ -310,7 +319,7 @@ protected:
         for (auto &r : registrations) {
             for (auto &p : r.inports) {
                 if (p.queue == topic) {
-                    MosquittoMessage m(message);
+                    MosquittoMessage m(message, _debugOutput);
 
                     r.handler(&m);
                 }
