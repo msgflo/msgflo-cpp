@@ -294,7 +294,7 @@ public:
 
 protected:
     string generateQueueName(const Definition &d, const Definition::Port &port) override {
-        return "/" + d.role + "." + string_to_upper_copy(port.id);
+        return d.role + "." + string_to_upper_copy(port.id);
     }
 
     virtual void on_msg(const string &msg) override {
