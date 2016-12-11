@@ -81,6 +81,8 @@ public:
     virtual std::string port() = 0;
 };
 
+using MessageHandler = std::function<void(Message *)>;
+
 class Engine;
 
 class Participant {
@@ -93,14 +95,21 @@ public:
 
     virtual void send(std::string port, const char *data, uint64_t len) = 0;
 
+    virtual void onMessage(const MessageHandler &handler) = 0;
+
 private:
 };
 
-using MessageHandler = std::function<void(Message *)>;
-
 class Engine {
 public:
-    virtual Participant *registerParticipant(const Definition &definition, MessageHandler handler) = 0;
+    virtual Participant *registerParticipant(const Definition &definition) = 0;
+
+    // API compatibility with existing signature
+    Participant *registerParticipant(const Definition &definition, MessageHandler handler) {
+        auto p = registerParticipant(definition);
+        p->onMessage(handler);
+        return p;
+    }
 
     virtual void launch() = 0;
 protected:
