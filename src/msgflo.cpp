@@ -44,18 +44,31 @@ private:
     Definition definition;
 };
 
+void defaultMessageHandler(msgflo::Message *msg) {
+    cout << "Warning: No message handler defined for msgflo::Participant" << endl;
+}
+
 template<typename Engine_t>
 struct ParticipantRegistrationT : public Participant {
     Engine_t *engine;
     const std::vector<Definition::Port> inports;
     const std::vector<Definition::Port> outports;
     const string id;
-    const MessageHandler handler;
+    MessageHandler handler;
     const DiscoveryMessage discoveryMessage;
 
-    ParticipantRegistrationT(Engine_t *engine, const Definition &definition, const MessageHandler &handler)
-        : engine(engine), inports(definition.inports), outports(definition.outports), id(generateId(definition)),
-          handler(handler), discoveryMessage(definition) {}
+    ParticipantRegistrationT(Engine_t *engine, const Definition &definition)
+        : engine(engine)
+        , inports(definition.inports)
+        , outports(definition.outports)
+        , id(generateId(definition))
+        , handler(defaultMessageHandler)
+        , discoveryMessage(definition)
+    {}
+
+    void onMessage(const MessageHandler &h) {
+        handler = h;
+    }
 
     virtual void send(std::string port, const json11::Json &json) override {
         send(port, json.dump());
@@ -192,9 +205,9 @@ public:
         });
     }
 
-    virtual Participant *registerParticipant(const Definition &definition, MessageHandler handler) override {
+    virtual Participant *registerParticipant(const Definition &definition) override {
         Definition d = validateDefinitionFromUser(definition);
-        registrations.emplace_back(this, d, handler);
+        registrations.emplace_back(this, d);
         return &registrations[registrations.size() - 1];
     }
 
@@ -289,9 +302,9 @@ public:
     virtual ~MosquittoEngine() {
     }
 
-    virtual Participant *registerParticipant(const Definition &definition, MessageHandler handler) override {
+    virtual Participant *registerParticipant(const Definition &definition) override {
         Definition d = validateDefinitionFromUser(definition);
-        registrations.emplace_back(this, d, handler);
+        registrations.emplace_back(this, d);
         return &registrations[registrations.size() - 1];
     }
 
