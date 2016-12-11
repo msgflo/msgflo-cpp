@@ -77,6 +77,8 @@ public:
     virtual void ack() = 0;
 
     virtual void nack() = 0;
+
+    virtual std::string port() = 0;
 };
 
 class Engine;
