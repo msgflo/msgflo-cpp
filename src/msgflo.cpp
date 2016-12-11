@@ -85,17 +85,26 @@ struct ParticipantRegistrationT : public Participant {
 
 class AbstractMessage : public Message {
 protected:
-    AbstractMessage(const char *data, const uint64_t len) : _data(data), _len(len) {}
+    AbstractMessage(const char *data, const uint64_t len, const std::string &port)
+        : _data(data)
+        , _len(len)
+        , _port(port)
+    {}
 
     virtual ~AbstractMessage() {};
 
     const char *_data;
     const uint64_t _len;
+    const std::string _port;
 
 public:
     virtual void data(const char **data, uint64_t *len) override {
         *data = this->_data;
         *len = this->_len;
+    }
+
+    virtual std::string port() override {
+        return _port;
     }
 
     virtual std::string asString() override {
@@ -145,8 +154,11 @@ protected:
 class AmqpEngine final : public Engine, protected AbstractEngine<AmqpEngine> {
 
     struct AmqpMessage final : public AbstractMessage {
-        AmqpMessage(AMQP::Channel &channel, uint64_t deliveryTag, const AMQP::Message &m)
-            : AbstractMessage(m.body(), m.bodySize()), _deliveryTag(deliveryTag), channel(channel) {
+        AmqpMessage(AMQP::Channel &channel, uint64_t deliveryTag, const AMQP::Message &m, const std::string &p)
+            : AbstractMessage(m.body(), m.bodySize(), p)
+            , _deliveryTag(deliveryTag)
+            ,channel(channel)
+        {
         }
 
         uint64_t _deliveryTag;
@@ -209,10 +221,10 @@ private:
     void setupInPort(const ParticipantRegistration &r, const Definition::Port &port) {
         channel.declareQueue(port.queue, AMQP::durable);
         channel.consume(port.queue).onReceived(
-            [r, this](const AMQP::Message &message,
+            [r, this, port](const AMQP::Message &message,
                       uint64_t deliveryTag,
                       bool redelivered) {
-                AmqpMessage msg(channel, deliveryTag, message);
+                AmqpMessage msg(channel, deliveryTag, message, port.id);
                 r.handler(&msg);
             });
     }
@@ -243,8 +255,8 @@ using msg_flo_mqtt_client = mqtt_client<trygvis::mqtt_support::mqtt_client_perso
 class MosquittoEngine final : public Engine, protected mqtt_event_listener, protected AbstractEngine<MosquittoEngine> {
 
     struct MosquittoMessage final : public AbstractMessage {
-        MosquittoMessage(const struct mosquitto_message *m, bool d)
-            : AbstractMessage(static_cast<char *>(m->payload), static_cast<uint64_t>(m->payloadlen))
+        MosquittoMessage(const struct mosquitto_message *m, bool d, const std::string &p)
+            : AbstractMessage(static_cast<char *>(m->payload), static_cast<uint64_t>(m->payloadlen), p)
             , _mid(m->mid)
             , _debugOutput(d)
         {
@@ -319,7 +331,7 @@ protected:
         for (auto &r : registrations) {
             for (auto &p : r.inports) {
                 if (p.queue == topic) {
-                    MosquittoMessage m(message, _debugOutput);
+                    MosquittoMessage m(message, _debugOutput, p.id);
 
                     r.handler(&m);
                 }
