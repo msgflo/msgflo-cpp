@@ -207,6 +207,7 @@ class mqtt_client : public waitable, private mqtt_lib {
     const string host;
     const int port;
     bool connecting_, connected_;
+    const string client_id;
     const int keep_alive;
     int unacked_messages_;
 
@@ -224,7 +225,7 @@ public:
     mqtt_client(mqtt_event_listener *event_listener, const string &host, const int port, const int keep_alive,
                 const string &client_id, const bool clean_session) :
         event_listener(event_listener), host(host), port(port), connecting_(false), connected_(false),
-        keep_alive(keep_alive), unacked_messages_(0) {
+        client_id(client_id), keep_alive(keep_alive), unacked_messages_(0) {
         const char *id = nullptr;
 
         if (!client_id.empty()) {
@@ -302,7 +303,7 @@ public:
     void connect() {
         guard lock(this_mutex);
 
-        auto msg = "Connecting to " + host + ":" + to_string(port) + ", keep_alive=" + to_string(keep_alive);
+        auto msg = "Connecting to " + host + ":" + to_string(port) + ", client_id=" + client_id + ", keep_alive=" + to_string(keep_alive);
         event_listener->on_msg(msg);
 
         if (connecting_ || connected_) {

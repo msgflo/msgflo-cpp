@@ -121,16 +121,18 @@ public:
         _debugOutput = std::getenv("MSGFLO_CPP_DEBUG") ? true : false;
     }
 
-    void debugOutput(bool on) {
+    EngineConfig& debugOutput(bool on) {
         _debugOutput = on;
+        return *this;
     };
 
     bool debugOutput() const {
         return _debugOutput;
     }
 
-    void url(const std::string &url) {
+    EngineConfig& url(const std::string &url) {
         _url = url;
+        return *this;
     };
 
     std::string url() const {

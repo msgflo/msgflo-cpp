@@ -382,6 +382,10 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
         }
     }
 
+    if (url.empty()) {
+        throw invalid_argument("Missing msgflo url and MSGFLO_BROKER is not set.");
+    }
+
     if (string_starts_with(url, "mqtt://")) {
         string host, username, password;
         int port = 1883;
@@ -394,7 +398,7 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
 
         if (i_up != string::npos) {
             string up = s.substr(0, i_up);
-            cout << "up: " << up << endl;
+            // cout << "up: " << up << endl;
 
             auto i_u = up.find(':');
 
@@ -404,11 +408,11 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
             } else {
                 username = up;
             }
-            cout << "username: " << username << endl;
-            cout << "password: " << password << endl;
+            // cout << "username: " << username << endl;
+            // cout << "password: " << password << endl;
 
             s = s.substr(i_up + 1);
-            cout << "s: " << s << endl;
+            // cout << "s: " << s << endl;
         }
 
         auto i_q = s.find('?');
@@ -416,7 +420,7 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
         if (i_q != string::npos) {
             host = s.substr(0, i_q);
             s = s.substr(i_q + 1);
-            cout << "s: " << s << endl;
+            // cout << "s: " << s << endl;
 
             while (!s.empty()) {
                 auto i_amp = s.find('&');
@@ -428,7 +432,7 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
                 } else {
                     kv = s.substr(0, i_amp);
                 }
-                cout << "kv: " << kv << endl;
+                // cout << "kv: " << kv << endl;
 
                 auto i_eq = kv.find('=');
 
@@ -439,6 +443,7 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
                 } else {
                     key = kv;
                 }
+                // cout << "key: " << key << endl;
 
                 if (key == "keepAlive") {
                     try {
@@ -464,7 +469,7 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
                     break;
                 }
                 s = s.substr(i_amp + 1);
-                cout << "s: " << s << endl;
+                // cout << "s: " << s << endl;
             }
         } else {
             host = s;
