@@ -18,7 +18,7 @@
     "coffee-script": "^1.8.0",
     "mocha": "~3.2.0",
     "msgflo": "^0.10.0",
-    "mqtt": "~1.4.0"
+    "mqtt": "~2.7.2"
   },
   "keywords": [],
   "bin": {},
