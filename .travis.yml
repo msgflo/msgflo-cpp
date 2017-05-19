@@ -4,7 +4,6 @@ services:
 - rabbitmq
 node_js:
 - '6'
-dist: trusty
 sudo: true
 before_install:
 - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
