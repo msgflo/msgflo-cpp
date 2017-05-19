@@ -1,4 +1,4 @@
-language: c
+language: node_js
 compiler: clang
 services:
 - rabbitmq
@@ -30,6 +30,3 @@ install:
 - cd -
 before_script:
 - mosquitto -d
-script:
-- npm test
-
