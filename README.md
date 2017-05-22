@@ -6,15 +6,17 @@ runtime. It integrates with other FBP tools like the [Flowhub](http://flowhub.io
 This library makes it easy to create MsgFlo participants in C++.
 
 msgflo-cpp is written in C++11 and is built on top of [AMQP-CPP](https://github.com/CopernicaMarketingSoftware/AMQP-CPP),
-and [json11](https://github.com/dropbox/json11).
+[libmosquitto](https://mosquitto.org) and [json11](https://github.com/dropbox/json11).
+
+msgflo-cpp is primarily used on Embedded Linux, but should also be portable to other operating systems.
 
 ## Status
 
-*Minimally useful*
+*In production*
 
-* Basic Participant support, sends discover
-* Supports AMQP/RabbitMQ and MQTT transports
-* Not used in production yet
+* Basic Participant support, sends MsgFlo discover message periodically
+* Supports MQTT 3.1.1 and AMQP 0-9-0 (RabbitMQ)
+* Used in production at Bitraf hackerspace for electronic [doorlocks](https://github.com/bitraf/dlock13) since 2016
 
 ## Usage
 
@@ -35,9 +37,3 @@ To enable debug logging, set the `MSGFLO_CPP_DEBUG` environment variable.
 
     export MSGFLO_CPP_DEBUG=1
 
-## TODO
-
-0.1
-
-* Fix missing port identifier in process()
-* AMQP: Implement NACK
