@@ -193,6 +193,22 @@ protected:
     vector<ParticipantRegistration> registrations;
 };
 
+// C-style subclassing
+// used to pass context for libev timer callback
+struct EvTimerWrapper {
+
+public:
+    struct ev_timer timer;
+    std::function<void (void)> callback;
+};
+
+static void timeout_cb(struct ev_loop *loop, ev_timer *timer, int revent) {
+    EvTimerWrapper *wrapper = (EvTimerWrapper *)timer;
+    if (wrapper->callback) {
+        wrapper->callback();
+    }
+}
+
 class AmqpEngine final : public Engine, protected AbstractEngine<AmqpEngine> {
 
     struct AmqpMessage final : public AbstractMessage {
@@ -216,11 +232,18 @@ class AmqpEngine final : public Engine, protected AbstractEngine<AmqpEngine> {
     };
 
 public:
-    AmqpEngine(const string &url)
-        : Engine(), loop(EV_DEFAULT), handler(loop), connection(&handler, AMQP::Address(url)), channel(&connection) {
+    AmqpEngine(const string &url, EngineConfig config)
+        : Engine()
+        , loop(EV_DEFAULT)
+        , handler(loop)
+        , connection(&handler, AMQP::Address(url))
+        , channel(&connection)
+        , discoveryPeriod(config.discoveryPeriod/3)
+    {
         channel.setQos(1); // TODO: is this prefech?
 
         channel.onReady([&]() {
+            connected = true;
             for(auto &r: registrations) {
                 for (const auto &port : r.inports) {
                     setupInPort(r, port);
@@ -241,6 +264,16 @@ public:
     }
 
     virtual void launch() override {
+        discoveryTimer.callback = [this]() {
+            if (not connected) {
+                return;
+            }
+            for(auto &r: registrations) {
+                this->sendDiscoveryMessage(r);
+            }
+        };
+        ev_timer_init(&discoveryTimer.timer, timeout_cb, discoveryPeriod, discoveryPeriod);
+        ev_timer_start(loop, &discoveryTimer.timer);
         ev_run(loop, 0);
     }
 
@@ -290,6 +323,9 @@ private:
     AMQP::LibEvHandler handler;
     AMQP::TcpConnection connection;
     AMQP::TcpChannel channel;
+    int64_t discoveryPeriod;
+    EvTimerWrapper discoveryTimer;
+    bool connected = false;
 };
 
 using msg_flo_mqtt_client = mqtt_client<trygvis::mqtt_support::mqtt_client_personality::polling>;
@@ -534,7 +570,7 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
 
         return make_shared<MosquittoEngine>(config, host, port, keep_alive, client_id, clean_session);
     } else if (string_starts_with(url, "amqp://")) {
-        return make_shared<AmqpEngine>(url);
+        return make_shared<AmqpEngine>(url, config);
     }
 
     throw std::runtime_error("Unsupported URL scheme: " + url);
