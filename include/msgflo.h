@@ -117,7 +117,10 @@ protected:
 
 class EngineConfig {
 public:
-    EngineConfig() : _debugOutput(false) {
+    EngineConfig()
+        : _debugOutput(false)
+        , discoveryPeriod(60)
+    {
         _debugOutput = std::getenv("MSGFLO_CPP_DEBUG") ? true : false;
     }
 
@@ -139,9 +142,10 @@ public:
         return _url;
     }
 
-private:
+public:
     bool _debugOutput;
     std::string _url;
+    int discoveryPeriod; // seconds
 };
 
 std::shared_ptr<Engine> createEngine(const EngineConfig config);
