@@ -27,6 +27,14 @@ std::string random_string( size_t length )
     return str;
 }
 
+int64_t millis_monotonic(void)
+{
+    struct timespec spec;
+    clock_gettime(CLOCK_MONOTONIC, &spec);
+    const int64_t ms = (spec.tv_sec*1000) + round(spec.tv_nsec / 1.0e6);
+    return ms;
+}
+
 std::string string_to_upper_copy(const std::string &str) {
     std::string ret;
     ret.resize(str.size());
@@ -315,8 +323,12 @@ class MosquittoEngine final : public Engine, protected mqtt_event_listener, prot
 
 public:
     MosquittoEngine(const EngineConfig config, const string &host, const int port,
-                    const int keep_alive, const string &client_id, const bool clean_session) :
-        _debugOutput(config.debugOutput()), client(this, host, port, keep_alive, client_id, clean_session) {
+                    const int keep_alive, const string &client_id, const bool clean_session)
+        : _debugOutput(config.debugOutput())
+        , client(this, host, port, keep_alive, client_id, clean_session)
+        , discoveryLastSent(0)
+        , discoveryPeriod(config.discoveryPeriod/3)
+    {
         client.connect();
     }
 
@@ -343,6 +355,14 @@ public:
         run = true;
 
         while (run) {
+            const auto t = millis_monotonic()/1000; 
+            if (connected and (t - discoveryLastSent) > discoveryPeriod) {
+                for(auto &r: registrations) {
+                    sendDiscoveryMessage(r);
+                }
+                discoveryLastSent = t;
+            }
+
             client.poll();
         }
     }
@@ -374,15 +394,21 @@ protected:
     }
 
     virtual void on_connect(int rc) override {
+        connected = true;
         for(auto &r: registrations) {
             for (auto &p : r.inports) {
                 on_msg("Connecting port " + p.id + " to mqtt topic " + p.queue);
                 client.subscribe(nullptr, p.queue, 0);
             }
-
-            string data = json11::Json(r.discoveryMessage).dump();
-            client.publish(nullptr, "fbp", 0, false, data);
+            sendDiscoveryMessage(r);
         }
+        discoveryLastSent = millis_monotonic()/1000;
+    }
+
+private:
+    void sendDiscoveryMessage(const ParticipantRegistration &r) {
+        const string data = json11::Json(r.discoveryMessage).dump();
+        client.publish(nullptr, "fbp", 0, false, data);
     }
 
 private:
@@ -390,6 +416,9 @@ private:
     atomic_bool run;
     msg_flo_mqtt_client client;
     vector<ParticipantRegistration> registrations;
+    bool connected;
+    int64_t discoveryLastSent;
+    const int64_t discoveryPeriod;
 };
 
 shared_ptr<Engine> createEngine(const EngineConfig config) {
