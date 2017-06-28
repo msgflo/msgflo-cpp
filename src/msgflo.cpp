@@ -359,12 +359,15 @@ class MosquittoEngine final : public Engine, protected mqtt_event_listener, prot
 
 public:
     MosquittoEngine(const EngineConfig config, const string &host, const int port,
-                    const int keep_alive, const string &client_id, const bool clean_session)
+                    const int keep_alive, const string &client_id, const bool clean_session, const std::string &user, const std::string &pw)
         : _debugOutput(config.debugOutput())
         , client(this, host, port, keep_alive, client_id, clean_session)
         , discoveryLastSent(0)
         , discoveryPeriod(config.discoveryPeriod/3)
     {
+        if (user.size()) {
+            client.setUsernamePassword(user, pw);
+        }
         client.connect();
     }
 
@@ -567,8 +570,7 @@ shared_ptr<Engine> createEngine(const EngineConfig config) {
             cout << "keep_alive: " << keep_alive << endl;
             cout << "clean_session: " << clean_session << endl;
         }
-
-        return make_shared<MosquittoEngine>(config, host, port, keep_alive, client_id, clean_session);
+        return make_shared<MosquittoEngine>(config, host, port, keep_alive, client_id, clean_session, username, password);
     } else if (string_starts_with(url, "amqp://")) {
         return make_shared<AmqpEngine>(url, config);
     }
