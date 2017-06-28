@@ -2,6 +2,8 @@
 
 #include <string>
 #include <memory>
+#include <functional>
+
 #include "json11.hpp"
 
 namespace msgflo {
