@@ -283,6 +283,10 @@ private:
     }
 
 public:
+    int setUsernamePassword(std::string user, std::string pass) {
+        return mosquitto_username_pw_set(mosquitto, user.c_str(), pass.c_str());
+    }
+
     int unacked_messages() {
         guard lock(this_mutex);
         return unacked_messages_;
