@@ -1,17 +1,12 @@
 language: node_js
-compiler: clang
 services:
 - rabbitmq
 node_js:
 - '6'
 sudo: true
-before_install:
-- sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-- sudo add-apt-repository ppa:boost-latest/ppa -y
-- sudo apt-get update -qq
-- sudo apt-get install g++-4.8
-- sudo apt-get install libboost1.55-all-dev libev-dev
-- sudo apt-get install pkg-config cmake openssl libc-ares-dev
+dist: trusty
+before_install: 
+- sudo apt-get install libev-dev pkg-config cmake openssl libc-ares-dev
 install:
 - export CC=gcc-4.8
 - export CXX=g++-4.8
