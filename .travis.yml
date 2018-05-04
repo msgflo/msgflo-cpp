@@ -3,6 +3,7 @@ services:
 - rabbitmq
 node_js:
 - '6'
+- '10'
 sudo: true
 dist: trusty
 before_install: 
